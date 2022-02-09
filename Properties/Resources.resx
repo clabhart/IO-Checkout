@@ -1,0 +1,250 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <!-- 
+    Microsoft ResX Schema 
+    
+    Version 2.0
+    
+    The primary goals of this format is to allow a simple XML format 
+    that is mostly human readable. The generation and parsing of the 
+    various data types are done through the TypeConverter classes 
+    associated with the data types.
+    
+    Example:
+    
+    ... ado.net/XML headers & schema ...
+    <resheader name="resmimetype">text/microsoft-resx</resheader>
+    <resheader name="version">2.0</resheader>
+    <resheader name="reader">System.Resources.ResXResourceReader, System.Windows.Forms, ...</resheader>
+    <resheader name="writer">System.Resources.ResXResourceWriter, System.Windows.Forms, ...</resheader>
+    <data name="Name1"><value>this is my long string</value><comment>this is a comment</comment></data>
+    <data name="Color1" type="System.Drawing.Color, System.Drawing">Blue</data>
+    <data name="Bitmap1" mimetype="application/x-microsoft.net.object.binary.base64">
+        <value>[base64 mime encoded serialized .NET Framework object]</value>
+    </data>
+    <data name="Icon1" type="System.Drawing.Icon, System.Drawing" mimetype="application/x-microsoft.net.object.bytearray.base64">
+        <value>[base64 mime encoded string representing a byte array form of the .NET Framework object]</value>
+        <comment>This is a comment</comment>
+    </data>
+                
+    There are any number of "resheader" rows that contain simple 
+    name/value pairs.
+    
+    Each data row contains a name, and value. The row also contains a 
+    type or mimetype. Type corresponds to a .NET class that support 
+    text/value conversion through the TypeConverter architecture. 
+    Classes that don't support this are serialized and stored with the 
+    mimetype set.
+    
+    The mimetype is used for serialized objects, and tells the 
+    ResXResourceReader how to depersist the object. This is currently not 
+    extensible. For a given mimetype the value must be set accordingly:
+    
+    Note - application/x-microsoft.net.object.binary.base64 is the format 
+    that the ResXResourceWriter will generate, however the reader can 
+    read any of the formats listed below.
+    
+    mimetype: application/x-microsoft.net.object.binary.base64
+    value   : The object must be serialized with 
+            : System.Runtime.Serialization.Formatters.Binary.BinaryFormatter
+            : and then encoded with base64 encoding.
+    
+    mimetype: application/x-microsoft.net.object.soap.base64
+    value   : The object must be serialized with 
+            : System.Runtime.Serialization.Formatters.Soap.SoapFormatter
+            : and then encoded with base64 encoding.
+
+    mimetype: application/x-microsoft.net.object.bytearray.base64
+    value   : The object must be serialized into a byte array 
+            : using a System.ComponentModel.TypeConverter
+            : and then encoded with base64 encoding.
+    -->
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="201" xml:space="preserve">
+    <value>$FBM201</value>
+  </data>
+  <data name="202" xml:space="preserve">
+    <value>$FBM202</value>
+  </data>
+  <data name="203" xml:space="preserve">
+    <value>$FBM203</value>
+  </data>
+  <data name="204" xml:space="preserve">
+    <value>$FBM204</value>
+  </data>
+  <data name="207" xml:space="preserve">
+    <value>$FBM207</value>
+  </data>
+  <data name="214" xml:space="preserve">
+    <value>$FBM214</value>
+  </data>
+  <data name="215" xml:space="preserve">
+    <value>$FBM215</value>
+  </data>
+  <data name="216" xml:space="preserve">
+    <value>$FBM216</value>
+  </data>
+  <data name="217" xml:space="preserve">
+    <value>$FBM217</value>
+  </data>
+  <data name="217R" xml:space="preserve">
+    <value>$FBM217R</value>
+  </data>
+  <data name="218" xml:space="preserve">
+    <value>$FBM218</value>
+  </data>
+  <data name="237" xml:space="preserve">
+    <value>$FBM237</value>
+  </data>
+  <data name="238" xml:space="preserve">
+    <value>$FBM238</value>
+  </data>
+  <data name="239" xml:space="preserve">
+    <value>$FBM239</value>
+  </data>
+  <data name="240" xml:space="preserve">
+    <value>$FBM240</value>
+  </data>
+  <data name="240R" xml:space="preserve">
+    <value>$FBM240R</value>
+  </data>
+  <data name="241" xml:space="preserve">
+    <value>$FBM241</value>
+  </data>
+  <data name="242" xml:space="preserve">
+    <value>$FBM242</value>
+  </data>
+  <data name="247" xml:space="preserve">
+    <value>$FBM247</value>
+  </data>
+  <data name="248" xml:space="preserve">
+    <value>$FBM248</value>
+  </data>
+  <data name="AOUT" xml:space="preserve">
+    <value>$AOUT</value>
+  </data>
+  <data name="BIN" xml:space="preserve">
+    <value>$BIN</value>
+  </data>
+  <data name="BOUT" xml:space="preserve">
+    <value>$BOUT</value>
+  </data>
+  <data name="CIN" xml:space="preserve">
+    <value>$CIN</value>
+  </data>
+  <data name="CINR" xml:space="preserve">
+    <value>$CINR</value>
+  </data>
+  <data name="COUT" xml:space="preserve">
+    <value>$COUT</value>
+  </data>
+  <data name="COUTR" xml:space="preserve">
+    <value>$COUTR</value>
+  </data>
+  <data name="Email" xml:space="preserve">
+    <value>cole.labhart@se.com</value>
+  </data>
+  <data name="Email Form" xml:space="preserve">
+    <value>Empty string in email form</value>
+  </data>
+  <data name="Email Sent" xml:space="preserve">
+    <value>Your email has been sent</value>
+  </data>
+  <data name="EmptyForm" xml:space="preserve">
+    <value>Please fill out the form.</value>
+  </data>
+  <data name="Feature Request Subject" xml:space="preserve">
+    <value>IO Checkout Feature Request</value>
+  </data>
+  <assembly alias="System.Windows.Forms" name="System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089" />
+  <data name="Instructions_for_Using_IO_Checkout_Tool" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\Instructions for Using IO Checkout Tool.pdf;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="MAIN" xml:space="preserve">
+    <value>$MAIN</value>
+  </data>
+  <data name="MCIN" xml:space="preserve">
+    <value>$MCIN</value>
+  </data>
+  <data name="MCOUT" xml:space="preserve">
+    <value>$MCOUT</value>
+  </data>
+  <data name="Report Bug Subject" xml:space="preserve">
+    <value>IO Checkout Bug Report</value>
+  </data>
+  <data name="RIN" xml:space="preserve">
+    <value>$RIN</value>
+  </data>
+  <data name="RINR" xml:space="preserve">
+    <value>$RINR</value>
+  </data>
+  <data name="ROUT" xml:space="preserve">
+    <value>$ROUT</value>
+  </data>
+  <data name="ROUTR" xml:space="preserve">
+    <value>$ROUTR</value>
+  </data>
+  <data name="Version Request Body" xml:space="preserve">
+    <value>Please send the current version of the IO Checkout Tool. My current version is</value>
+  </data>
+  <data name="Version Request Subject" xml:space="preserve">
+    <value>IO Checkout Latest Version</value>
+  </data>
+</root>
