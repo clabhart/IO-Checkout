@@ -1,34 +1,19 @@
-﻿using IOCheckoutTool.Properties;
-using Microsoft.Toolkit.Extensions;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Xml;
 
+using IOCheckoutTool.Properties;
+
 namespace IOCheckoutTool
 {
     public class FBM : IDisposable
     {
-        public string FBMType { get; set; }
-        public string FBMName { get; set; }
-        public string RedundantName { get; set; }
-        public string Channel { get; set; }
-        public string CP { get; set; }
-        public string ECB { get; set; }
-        public string RedundantECB { get; set; }
-        public string OMSET { get; set; }
-        public static string Strategy { get; set; }
-        public static string Compound { get; set; }
-        public CP Controller { get; set; }
-        public DirectoryInfo Project { get; set; }
-        public StreamWriter DriverWriter { get; set; }
-        public StreamWriter ECBWriter { get; set; }
-        public XmlDocument DAFile { get; set; }
-        public XmlElement DA { get; set; }
+        #region Fields
 
-        internal static readonly string[][] FBMs =
+        internal static readonly string[][] _fbms =
         {
             new string[]{"FBM201", "201", "1"},
             new string[]{"FBM202", "202", "1"},
@@ -55,7 +40,7 @@ namespace IOCheckoutTool
             new string[]{"FBM233", "233", "233"},
             new string[]{"FBM237", "237", "237"},
             new string[]{"FBM238", "238", "238"},
-            new string[]{"FBM239", "239", "239"},
+            new string[]{"FBM239", "239", "5"},
             new string[]{"FBM240", "240", "240"},
             new string[]{"FBM240R", "240", "240"},
             new string[]{"FBM241", "241", "241"},
@@ -66,47 +51,134 @@ namespace IOCheckoutTool
             new string[]{"FBM248", "248", "248"}
         };
 
+        #endregion Fields
+
+        #region Properties
+        public static string OMSET { get; set; } = "D:\\opt\\fox\\bin\\tools\\omset";
+        public string Channel { get; set; } = string.Empty;
+        public string Compound { get => $"{FBMName}_IO"; }
+        public CP Controller { get; set; } = new();
+
+        public string CP { get; set; } = string.Empty;
+
+        public XmlElement DA { get; set; }
+
+        public XmlDocument DAFile { get; set; }
+
+        public StreamWriter DriverWriter { get; set; }
+
+        public string ECB
+        {
+            get => FBMName.Length switch
+            {
+                > 9 => FBMName[0..^3],
+                _ => FBMName
+            };
+        }
+
+        public StreamWriter ECBWriter { get; set; }
+
+        public string FBMName { get; set; } = string.Empty;
+
+        public string FBMType { get; set; } = string.Empty;
+
+        public DirectoryInfo Project { get; set; }
+
+        public string RedundantECB
+        {
+            get => RedundantName.Length switch
+            {
+                > 9 => RedundantName[0..^3],
+                _ => RedundantName
+            };
+        }
+
+        public string RedundantName { get; set; } = string.Empty;
+
+        public string Strategy
+        {
+            get => FBMName.Length switch
+            {
+                > 9 => FBMName[0..^3],
+                _ => FBMName
+            };
+        }
+
+        #endregion Properties
+
+        #region Public Methods
+
+        public virtual void AOUT(int i)
+        {
+            string blockname = $"{FBMName}{i.ToString(CultureInfo.InvariantCulture)}";
+            WriteDriver($"ADD {Compound}:{blockname}");
+            WriteDriver("TYPE = AOUT");
+            WriteDriver($"DESCRP = FBM{FBMType}");
+            WriteDriver($"IOM_ID = {FBMName}");
+            WriteDriver("IOMOPT  = 1");
+            WriteDriver("MA  = 1");
+            WriteDriver($"PNT_NO = {i.ToString(CultureInfo.InvariantCulture)}");
+            WriteDriver($"MEAS = {Compound}:{FBMName}.PNT_{i.ToString(CultureInfo.InvariantCulture)}");
+            WriteDriver("END");
+            Append(DirectAccessCreateBlock(Resources.AOUT, blockname));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "DESCRP", $"FBM{FBMType}"));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "IOM_ID", FBMName));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "IOMOPT", "1"));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "MA", "1"));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "PNT_NO", i.ToString(CultureInfo.InvariantCulture)));
+            Append(DirectAccessCreateBlockAddressCxn(blockname, "MEAS", blockname));
+        }
+
+        public void Append(XmlNode node)
+        {
+            DA.AppendChild(node);
+        }
+
+        public virtual void BIN(int i)
+        {
+            string blockname = $"{ECB}{i.ToString(CultureInfo.InvariantCulture)}";
+            WriteDriver($"ADD {Compound}:{blockname}");
+            WriteDriver("TYPE = BIN");
+            WriteDriver($"DESCRP = FBM{FBMType}");
+            WriteDriver($"IOM_ID = {blockname}");
+            WriteDriver("PNT_NO = DI 20 80");
+            WriteDriver("MA  = 1");
+            WriteDriver("END");
+            Append(DirectAccessCreateBlock(Resources.BIN, blockname));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "DESCRP", $"FBM{FBMType}"));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "IOM_ID", blockname));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "PNT_NO", "DI 20 80"));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "MA", "1"));
+        }
+
+        public virtual void BOUT(int i)
+        {
+            string blockname = $"{ECB}{i.ToString(CultureInfo.InvariantCulture)}";
+            WriteDriver($"ADD {Compound}:{blockname}");
+            WriteDriver("TYPE = BOUT");
+            WriteDriver($"DESCRP = FBM{FBMType}");
+            WriteDriver($"IOM_ID = {blockname}");
+            WriteDriver("MA  = 1");
+            WriteDriver(string.Concat("IN = ", Compound, ":", FBMName, ".CIN_", i.ToString(CultureInfo.InvariantCulture)));
+            WriteDriver("PNT_NO = DO");
+            WriteDriver("END");
+            Append(DirectAccessCreateBlock(Resources.BOUT, blockname));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "DESCRP", $"FBM{FBMType}"));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "IOM_ID", blockname));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "PNT_NO", "DO"));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "MA", "1"));
+            Append(DirectAccessCreateBlockAddressCxn(blockname, "IN", string.Concat(FBMName, ".CIN_", i.ToString(CultureInfo.InvariantCulture))));
+        }
+
         public virtual void Build()
         {
-            if (FBMName.Length > 9)
-            {
-                ECB = FBMName[0..^3];
-            }
-            else
-            {
-                ECB = FBMName;
-            }
-            if (RedundantName != null)
-            {
-                if (RedundantName.Length > 9)
-                {
-                    RedundantECB = RedundantName[0..^3];
-                }
-                else
-                {
-                    RedundantECB = RedundantName;
-                }
-            }
-            if (FBMName.Length > 6)
-            {
-                Strategy = string.Concat(FBMName[..6], "CHKOUT");
-            }
-            else
-            {
-                Strategy = string.Concat(FBMName, "CHKOUT");
-            }
-            Compound = string.Concat(FBMName, "_IO");
-            OMSET = "D:\\opt\\fox\\bin\\tools\\omset";
-            int row = GetIndexes(FBMs, FBMType);
             if (File.Exists(Path.Combine(Project.FullName, string.Concat(CP, ".i"))))
             {
                 DriverWriter = new StreamWriter(Path.Combine(Project.FullName, string.Concat(CP, ".i")), append: true);
                 ECBWriter = new StreamWriter(Path.Combine(Project.FullName, string.Concat("ChildECBEnable_", CP, ".bat")), append: true);
                 Append(DirectAccessCreateFBM(GetFBMTemplare(FBMType), FBMName));
-                Append(DirectAccessUpdateECBAttribute(FBMName, "CHAN", Channel.Replace("CH", "", StringComparison.InvariantCultureIgnoreCase)));
+                Append(DirectAccessUpdateECBAttribute(FBMName, "CHAN", Channel.Replace("CH ", "", StringComparison.InvariantCultureIgnoreCase)));
                 Append(DirectAccessUpdateECBAttribute(FBMName, "DEV_ID", FBMName));
-                Append(DirectAccessUpdateECBAttribute(FBMName, "HWTYPE", FBMs[row][1]));
-                Append(DirectAccessUpdateECBAttribute(FBMName, "SWTYPE", FBMs[row][2]));
                 CreateCompound();
             }
             else
@@ -115,40 +187,122 @@ namespace IOCheckoutTool
                 ECBWriter = new StreamWriter(Path.Combine(Project.FullName, string.Concat("ChildECBEnable_", CP, ".bat")));
                 WriteDriver(string.Concat("OPEN ", CP, " ALL IOCHKOUT"));
                 Append(DirectAccessCreateFBM(GetFBMTemplare(FBMType), FBMName));
-                Append(DirectAccessUpdateECBAttribute(FBMName, "CHAN", Channel.Replace("CH", "", StringComparison.InvariantCultureIgnoreCase)));
+                Append(DirectAccessUpdateECBAttribute(FBMName, "CHAN", Channel.Replace("CH ", "", StringComparison.InvariantCultureIgnoreCase)));
                 Append(DirectAccessUpdateECBAttribute(FBMName, "DEV_ID", FBMName));
-                Append(DirectAccessUpdateECBAttribute(FBMName, "HWTYPE", FBMs[row][1]));
-                Append(DirectAccessUpdateECBAttribute(FBMName, "SWTYPE", FBMs[row][2]));
                 CreateCompound();
                 Batch();
             }
         }
 
-        private static int GetIndexes(string[][] Items, string SearchChar)
+        public virtual void CIN(int i)
         {
-            for (int i = 0; i < Items.Length; i++)
-            {
-                if (Items[i][0].Contains(SearchChar, StringComparison.InvariantCultureIgnoreCase))
-                {
-                    return i;
-                }
-            }
-            return -1;
+            string blockname = $"{FBMName}{i.ToString(CultureInfo.InvariantCulture)}";
+            WriteDriver($"ADD {Compound}:{blockname}");
+            WriteDriver("TYPE = CIN");
+            WriteDriver($"DESCRP = FBM{FBMType}");
+            WriteDriver($"IOM_ID = {FBMName}");
+            WriteDriver($"PNT_NO = {i.ToString(CultureInfo.InvariantCulture)}");
+            WriteDriver("MA  = 1");
+            WriteDriver("END");
+            Append(DirectAccessCreateBlock(Resources.CIN, blockname));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "DESCRP", $"FBM{FBMType}"));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "IOM_ID", FBMName));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "MA", "1"));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "PNT_NO", i.ToString(CultureInfo.InvariantCulture)));
         }
 
-        public void Append(XmlNode node)
+        public virtual void CINR(int i)
         {
-            DA.AppendChild(node);
+            string blockname = $"{FBMName}{i.ToString(CultureInfo.InvariantCulture)}";
+            WriteDriver($"ADD {Compound}:{blockname}");
+            WriteDriver("TYPE = CINR");
+            WriteDriver($"DESCRP = FBM{FBMType}");
+            WriteDriver($"IOM_ID = {FBMName}");
+            WriteDriver("MA  = 1");
+            WriteDriver($"IOMIDR = {RedundantName}");
+            WriteDriver($"PNT_NO = {i.ToString(CultureInfo.InvariantCulture)}");
+            WriteDriver("END");
+            Append(DirectAccessCreateBlock(Resources.CINR, blockname));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "DESCRP", $"FBM{FBMType}"));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "IOM_ID", FBMName));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "IOMIDR", RedundantName));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "MA", "1"));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "PNT_NO", i.ToString(CultureInfo.InvariantCulture)));
         }
 
-        public void WriteDriver(string line)
+        public virtual void COUT(int i)
         {
-            DriverWriter.WriteLine(line);
+            string blockname = $"{FBMName}{i.ToString(CultureInfo.InvariantCulture)}";
+            WriteDriver($"ADD {Compound}:{blockname}");
+            WriteDriver("TYPE = COUT");
+            WriteDriver($"DESCRP = FBM{FBMType}");
+            WriteDriver($"IOM_ID = {FBMName}");
+            WriteDriver("MA  = 1");
+            WriteDriver($"IN = {Compound}:{FBMName}.IN_{i.ToString(CultureInfo.InvariantCulture)}");
+            WriteDriver($"PNT_NO = {i.ToString(CultureInfo.InvariantCulture)}");
+            WriteDriver("END");
+            Append(DirectAccessCreateBlock(Resources.COUT, blockname));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "DESCRP", $"FBM{FBMType}"));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "IOM_ID", FBMName));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "MA", "1"));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "PNT_NO", i.ToString(CultureInfo.InvariantCulture)));
+            Append(DirectAccessCreateBlockAddressCxn(blockname, "IN", $"{FBMName}.IN_{i.ToString(CultureInfo.InvariantCulture)}"));
         }
 
-        public void WriteECB(string line)
+        public virtual void COUTR(int i)
         {
-            ECBWriter.WriteLine(line);
+            string blockname = $"{FBMName}{i.ToString(CultureInfo.InvariantCulture)}";
+            WriteDriver($"ADD {Compound}:{blockname}");
+            WriteDriver("TYPE = COUTR");
+            WriteDriver($"DESCRP = FBM{FBMType}");
+            WriteDriver($"IOM_ID = {FBMName}");
+            WriteDriver($"IOMIDR = {RedundantName}");
+            WriteDriver("MA  = 1");
+            WriteDriver($"PNT_NO = {i.ToString(CultureInfo.InvariantCulture)}");
+            WriteDriver($"IN = {Compound}:{FBMName}.CO_{i.ToString(CultureInfo.InvariantCulture)}");
+            WriteDriver("END");
+            Append(DirectAccessCreateBlock(Resources.COUTR, blockname));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "DESCRP", $"FBM{FBMType}"));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "IOM_ID", FBMName));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "MA", "1"));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "PNT_NO", i.ToString(CultureInfo.InvariantCulture)));
+            Append(DirectAccessCreateBlockAddressCxn(blockname, "IN", $"{FBMName}.CO_{i.ToString(CultureInfo.InvariantCulture)}"));
+        }
+
+        public XmlNode DirectAccessCreateBlock(string template, string name)
+        {
+            XmlElement block = DAFile.CreateElement("CreateBlock");
+            block.SetAttribute("Template", template);
+            block.SetAttribute("Block", name);
+            block.SetAttribute("Strategy", Strategy);
+            return block;
+        }
+
+        public XmlNode DirectAccessCreateBlockAddressCxn(string sink, string parameter, string source)
+        {
+            XmlElement attribute = DAFile.CreateElement("CreateBlockAddressCxn");
+            attribute.SetAttribute("Strategy", Strategy);
+            attribute.SetAttribute("Sink", sink);
+            attribute.SetAttribute("SinkParm", parameter);
+            attribute.SetAttribute("SinkValue", source);
+            return attribute;
+        }
+
+        public XmlNode DirectAccessCreateCompound()
+        {
+            XmlElement compound = DAFile.CreateElement("CreateCompound");
+            compound.SetAttribute("Compound", Compound);
+            compound.SetAttribute("Controller", CP);
+            return compound;
+        }
+
+        public XmlNode DirectAccessCreateECB(string name)
+        {
+            XmlElement ecb = DAFile.CreateElement("CreateDevice");
+            ecb.SetAttribute("Template", "$DEV_ECB201");
+            ecb.SetAttribute("Device", name);
+            ecb.SetAttribute("FBM", FBMName);
+            return ecb;
         }
 
         public XmlNode DirectAccessCreateFBM(string template, string name)
@@ -160,6 +314,24 @@ namespace IOCheckoutTool
             return fbm;
         }
 
+        public XmlNode DirectAccessCreateStrategy()
+        {
+            XmlElement strategy = DAFile.CreateElement("CreateStrategy");
+            strategy.SetAttribute("Template", "$Strategy");
+            strategy.SetAttribute("Strategy", Strategy);
+            strategy.SetAttribute("Compound", Compound);
+            return strategy;
+        }
+
+        public XmlNode DirectAccessDeployCompound()
+        {
+            XmlElement ecb = DAFile.CreateElement("DeployCompound");
+            ecb.SetAttribute("Compound", Compound);
+            ecb.SetAttribute("Cascade", "Yes");
+            ecb.SetAttribute("Reason", "Reason1");
+            return ecb;
+        }
+
         public XmlNode DirectAccessUpdateBlockAttribute(string block, string parameter, string value)
         {
             XmlElement attribute = DAFile.CreateElement("UpdateBlockAttribute");
@@ -167,16 +339,6 @@ namespace IOCheckoutTool
             attribute.SetAttribute("Block", block);
             attribute.SetAttribute("ParmName", parameter);
             attribute.SetAttribute("ParmValue", value);
-            return attribute;
-        }
-
-        public XmlNode DirectAccessCreateBlockAddressCxn(string sink, string parameter, string source)
-        {
-            XmlElement attribute = DAFile.CreateElement("CreateBlockAddressCxn");
-            attribute.SetAttribute("Strategy", Strategy);
-            attribute.SetAttribute("Sink", sink);
-            attribute.SetAttribute("SinkParm", parameter);
-            attribute.SetAttribute("SinkValue", source);
             return attribute;
         }
 
@@ -190,49 +352,317 @@ namespace IOCheckoutTool
             return attribute;
         }
 
-        public XmlNode DirectAccessCreateCompound()
+        public void Dispose()
         {
-            XmlElement compound = DAFile.CreateElement("CreateCompound");
-            compound.SetAttribute("Compound", Compound);
-            compound.SetAttribute("Controller", CP);
-            return compound;
+            Dispose(true);
+            GC.SuppressFinalize(this);
         }
 
-        public XmlNode DirectAccessCreateStrategy()
+        public virtual void ECB1()
         {
-            XmlElement strategy = DAFile.CreateElement("CreateStrategy");
-            strategy.SetAttribute("Template", "$Strategy");
-            strategy.SetAttribute("Strategy", Strategy);
-            strategy.SetAttribute("Compound", Compound);
-            return strategy;
+            WriteDriver($"ADD {CP}_ECB:{FBMName}");
+            WriteDriver("TYPE = ECB1");
+            WriteDriver($"DEV_ID = {FBMName}");
+            WriteDriver($"HWTYPE = {FBMType}");
+            WriteDriver("SWTYPE = 1");
+            WriteDriver($"CHAN = {Channel.Replace("CH ", "", StringComparison.InvariantCultureIgnoreCase)}");
+            WriteDriver("END");
         }
 
-        public XmlNode DirectAccessCreateBlock(string template, string name)
+        public virtual void ECB2()
         {
-            XmlElement block = DAFile.CreateElement("CreateBlock");
-            block.SetAttribute("Template", template);
-            block.SetAttribute("Block", name);
-            block.SetAttribute("Strategy", Strategy);
-            return block;
+            WriteDriver($"ADD {CP}_ECB:{FBMName}");
+            WriteDriver("TYPE = ECB2");
+            WriteDriver($"DEV_ID = {FBMName}");
+            WriteDriver($"HWTYPE = {FBMType}");
+            WriteDriver("SWTYPE = 2");
+            WriteDriver($"CHAN = {Channel.Replace("CH ", "", StringComparison.InvariantCultureIgnoreCase)}");
+            WriteDriver("END");
         }
 
-        public XmlNode DirectAccessCreateECB(string name)
+        public virtual void ECB200()
         {
-            XmlElement ecb = DAFile.CreateElement("CreateDevice");
-            ecb.SetAttribute("Template", "$DEV_ECB201");
-            ecb.SetAttribute("Device", name);
-            ecb.SetAttribute("FBM", FBMName);
-            return ecb;
+            WriteDriver($"ADD {CP}_ECB:{FBMName}");
+            WriteDriver("TYPE = ECB200");
+            WriteDriver($"DEV_ID = {FBMName[1..5]}");
+            WriteDriver($"HWTYPE = {FBMType}");
+            WriteDriver($"SWTYPE = {FBMType}");
+            WriteDriver($"CHAN = {Channel.Replace("CH ", "", StringComparison.InvariantCultureIgnoreCase)}");
+            WriteDriver("END");
         }
 
-        public XmlNode DirectAccessDeployCompound()
+        public virtual void ECB201(int i, string blockktype = "")
         {
-            XmlElement ecb = DAFile.CreateElement("DeployCompound");
-            ecb.SetAttribute("Compound", Compound);
-            ecb.SetAttribute("Cascade", "Yes");
-            ecb.SetAttribute("Reason", "Reason1");
-            return ecb;
+            string blockname = $"{ECB}{i.ToString(CultureInfo.InvariantCulture)}";
+            string compound = string.Concat(CP, "_ECB");
+            string devid = string.Concat(ECB[1..6], i.ToString(CultureInfo.InvariantCulture));
+            WriteDriver($"ADD {Compound}:{blockname}");
+            WriteDriver("TYPE = ECB201");
+            WriteDriver(string.Concat("DEV_ID = ", devid));
+            WriteDriver($"HWTYPE = {FBMType}");
+            WriteDriver($"SWTYPE = {FBMType}");
+            WriteDriver(string.Concat("PARENT = ", CP, "_ECB:", FBMName));
+            WriteDriver(string.Concat("DVNAME = CH", i.ToString(CultureInfo.InvariantCulture)));
+            WriteDriver("DVOPTS = 4-20");
+            WriteDriver("END");
+            WriteECB($"echo Enabling {ECB}{i.ToString(CultureInfo.InvariantCulture)}");
+            WriteECB($"{OMSET} -l 1 {compound}:{blockname}.ACTION");
+            Append(DirectAccessCreateECB(blockname));
+            Append(DirectAccessUpdateECBAttribute(blockname, "DEV_ID", devid));
+            Append(DirectAccessUpdateECBAttribute(blockname, "HWTYPE", FBMType));
+            Append(DirectAccessUpdateECBAttribute(blockname, "SWTYPE", FBMType));
+            Append(DirectAccessUpdateECBAttribute(blockname, "DVNAME", $"CH{i.ToString(CultureInfo.InvariantCulture)}"));
+            Append(DirectAccessUpdateECBAttribute(blockname, "DVOPTS", "4-20"));
         }
+
+        public virtual void ECB202()
+        {
+            WriteDriver($"ADD {CP}_ECB:{FBMName}");
+            WriteDriver("TYPE = ECB202");
+            WriteDriver(string.Concat("DEV_ID = ", FBMName[..6]));
+            WriteDriver($"HWTYPE = {FBMType}");
+            WriteDriver($"SWTYPE = {FBMType}");
+            WriteDriver($"CHAN = {Channel.Replace("CH ", "", StringComparison.InvariantCultureIgnoreCase)}");
+            WriteDriver("END");
+        }
+
+        public virtual void ECB4()
+        {
+            WriteDriver($"ADD {CP}_ECB:{FBMName}");
+            WriteDriver("TYPE = ECB4");
+            WriteDriver($"DEV_ID = {FBMName}");
+            WriteDriver("HWTYPE = 206");
+            WriteDriver("SWTYPE = 4");
+            WriteDriver($"CHAN = {Channel.Replace("CH ", "", StringComparison.InvariantCultureIgnoreCase)}");
+            WriteDriver("END");
+        }
+
+        public virtual void ECB5()
+        {
+            WriteDriver($"ADD {CP}_ECB:{FBMName}");
+            WriteDriver("TYPE = ECB5");
+            WriteDriver($"DEV_ID = {FBMName}");
+            WriteDriver($"HWTYPE = {FBMType}");
+            WriteDriver("SWTYPE = 5");
+            WriteDriver($"CHAN = {Channel.Replace("CH ", "", StringComparison.InvariantCultureIgnoreCase)}");
+            WriteDriver("END");
+        }
+
+        public virtual void ECB53()
+        {
+            WriteDriver($"ADD {CP}_ECB:{FBMName}");
+            WriteDriver("TYPE = ECB53");
+            WriteDriver($"DEV_ID = {FBMName}");
+            WriteDriver($"HWTYPE = {FBMType}");
+            WriteDriver($"SWTYPE = {FBMType}");
+            WriteDriver($"CHAN = {Channel.Replace("CH ", "", StringComparison.InvariantCultureIgnoreCase)}");
+            WriteDriver("END");
+        }
+
+        public virtual void MAIN()
+        {
+            WriteDriver($"ADD {Compound}:{FBMName}");
+            WriteDriver("TYPE = MAIN");
+            WriteDriver($"DESCRP = FBM{FBMType}");
+            WriteDriver("IOMOPT = 2");
+            WriteDriver($"IOM_ID = {FBMName}");
+            WriteDriver("MA  = 1");
+            WriteDriver("END");
+            Append(DirectAccessCreateBlock(Resources.MAIN, FBMName));
+            Append(DirectAccessUpdateBlockAttribute(FBMName, "DESCRP", $"FBM{FBMType}"));
+            Append(DirectAccessUpdateBlockAttribute(FBMName, "IOMOPT", "2"));
+            Append(DirectAccessUpdateBlockAttribute(FBMName, "IOM_ID", FBMName));
+            Append(DirectAccessUpdateBlockAttribute(FBMName, "MA", "1"));
+        }
+
+        public virtual void MCIN()
+        {
+            WriteDriver($"ADD {Compound}:{FBMName}");
+            WriteDriver("TYPE = MCIN");
+            WriteDriver($"DESCRP = FBM{FBMType}");
+            WriteDriver($"IOM_ID = {FBMName}");
+            WriteDriver("IOMOPT = 1");
+            WriteDriver("END");
+            Append(DirectAccessCreateBlock(Resources.MCIN, FBMName));
+            Append(DirectAccessUpdateBlockAttribute(FBMName, "DESCRP", $"FBM{FBMType}"));
+            Append(DirectAccessUpdateBlockAttribute(FBMName, "IOM_ID", FBMName));
+            Append(DirectAccessUpdateBlockAttribute(FBMName, "IOMOPT", "1"));
+            Append(DirectAccessUpdateBlockAttribute(FBMName, "MA", "1"));
+        }
+
+        public virtual void MCOUT()
+        {
+            WriteDriver($"ADD {Compound}:{FBMName}");
+            WriteDriver("TYPE = MCOUT");
+            WriteDriver($"DESCRP = FBM{FBMType}");
+            WriteDriver($"IOM_ID = {FBMName}");
+            WriteDriver("IOMOPT = 1");
+            WriteDriver("MA  = 1");
+            WriteDriver("END");
+            Append(DirectAccessCreateBlock(Resources.MCOUT, FBMName));
+            Append(DirectAccessUpdateBlockAttribute(FBMName, "DESCRP", $"FBM{FBMType}"));
+            Append(DirectAccessUpdateBlockAttribute(FBMName, "IOM_ID", FBMName));
+            Append(DirectAccessUpdateBlockAttribute(FBMName, "IOMOPT", "1"));
+            Append(DirectAccessUpdateBlockAttribute(FBMName, "MA", "1"));
+        }
+
+        public virtual void RIN(int i)
+        {
+            string blockname = $"{ECB}{i.ToString(CultureInfo.InvariantCulture)}";
+            WriteDriver($"ADD {Compound}:{blockname}");
+            WriteDriver("TYPE = RIN");
+            WriteDriver($"DESCRP = FBM{FBMType}");
+            WriteDriver($"IOM_ID = {blockname}");
+            WriteDriver("PNT_NO = CURRENT");
+            WriteDriver("SCI = 0");
+            WriteDriver("HSCI1 = 65535");
+            WriteDriver("LSCI1 = 0");
+            WriteDriver("MA  = 1");
+            WriteDriver("END");
+            Append(DirectAccessCreateBlock(Resources.RIN, blockname));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "DESCRP", $"FBM{FBMType}"));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "IOM_ID", blockname));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "PNT_NO", "CURRENT"));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "SCI", "0"));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "HSCI1", "65535"));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "LSCI1", "0"));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "MA", "1"));
+        }
+
+        public virtual void RINR(int i)
+        {
+            string blockname = $"{ECB}{i.ToString(CultureInfo.InvariantCulture)}";
+            string redundantname = $"{RedundantECB}{i.ToString(CultureInfo.InvariantCulture)}";
+            WriteDriver($"ADD {Compound}:{blockname}");
+            WriteDriver("TYPE = RINR");
+            WriteDriver($"DESCRP = FBM{FBMType}");
+            WriteDriver(string.Concat("IOMID1 = ", blockname));
+            WriteDriver(string.Concat("IOMID2 = ", redundantname));
+            WriteDriver("PNT_NO = CURRENT");
+            WriteDriver("SCI = 0");
+            WriteDriver("HSCI1 = 65535");
+            WriteDriver("LSCI1 = 0");
+            WriteDriver("MA  = 1");
+            WriteDriver("END");
+            Append(DirectAccessCreateBlock(Resources.RINR, blockname));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "DESCRP", $"FBM{FBMType}"));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "IOMID1", blockname));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "IOMID2", redundantname));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "PNT_NO", "CURRENT"));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "SCI", "0"));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "HSCI1", "65535"));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "LSCI1", "0"));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "MA", "1"));
+        }
+
+        public virtual void ROUT(int i)
+        {
+            string blockname = $"{ECB}{i.ToString(CultureInfo.InvariantCulture)}";
+            WriteDriver($"ADD {Compound}:{blockname}");
+            WriteDriver("TYPE = ROUT");
+            WriteDriver($"DESCRP = FBM{FBMType}");
+            WriteDriver($"IOM_ID = {blockname}");
+            WriteDriver("PNT_NO = CURRENT");
+            WriteDriver("SCO = 3");
+            WriteDriver("MA  = 1");
+            WriteDriver($"MEAS = {Compound}:{FBMName}.PNT_{i.ToString(CultureInfo.InvariantCulture)}");
+            WriteDriver("END");
+            Append(DirectAccessCreateBlock(Resources.ROUT, blockname));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "DESCRP", $"FBM{FBMType}"));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "IOM_ID", blockname));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "PNT_NO", "CURRENT"));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "SCI", "0"));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "MA", "1"));
+            Append(DirectAccessCreateBlockAddressCxn(blockname, "MEAS", $"{FBMName}.PNT_{i.ToString(CultureInfo.InvariantCulture)}"));
+        }
+
+        public virtual void ROUTR(int i)
+        {
+            string blockname = $"{ECB}{i.ToString(CultureInfo.InvariantCulture)}";
+            string redundantname = $"{RedundantECB}{i.ToString(CultureInfo.InvariantCulture)}";
+            WriteDriver($"ADD {Compound}:{blockname}");
+            WriteDriver("TYPE = ROUT");
+            WriteDriver($"DESCRP = FBM{FBMType}");
+            WriteDriver($"IOMID1 = {blockname}");
+            WriteDriver($"IOMID2 = {RedundantName}");
+            WriteDriver("PNT_NO = CURRENT");
+            WriteDriver("SCO = 3");
+            WriteDriver("MA  = 1");
+            WriteDriver($"MEAS = {Compound}:{FBMName}.PNT_{i.ToString(CultureInfo.InvariantCulture)}");
+            WriteDriver("END");
+            Append(DirectAccessCreateBlock(Resources.ROUTR, blockname));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "DESCRP", $"FBM{FBMType}"));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "IOMID1", blockname));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "IOMID2", redundantname));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "PNT_NO", "CURRENT"));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "SCI", "0"));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "MA", "1"));
+            Append(DirectAccessCreateBlockAddressCxn(blockname, "MEAS", $"{FBMName}.PNT_{i.ToString(CultureInfo.InvariantCulture)}"));
+        }
+
+        public void WriteDriver(string line)
+        {
+            DriverWriter.WriteLine(line);
+        }
+
+        public void WriteECB(string line)
+        {
+            ECBWriter.WriteLine(line);
+        }
+
+        #endregion Public Methods
+
+        #region Protected Methods
+
+        protected void Batch()
+        {
+            WriteECB("@echo off");
+            WriteECB("echo This script will enable all hart child ECBs on all CPs.");
+            WriteECB("pause");
+        }
+
+        protected void CreateCompound()
+        {
+            WriteDriver($"ADD {Compound}");
+            WriteDriver("TYPE = COMPND ");
+            WriteDriver("ON = 1");
+            WriteDriver("END");
+            Append(DirectAccessCreateCompound());
+            Append(DirectAccessCreateStrategy());
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                if (ECBWriter != null)
+                {
+                    ECBWriter.Close();
+                    ECBWriter.Dispose();
+                }
+                if (DriverWriter != null)
+                {
+                    DriverWriter.Close();
+                    DriverWriter.Dispose();
+                }
+                if (!string.IsNullOrEmpty(FBMName))
+                {
+                    DA.AppendChild(DirectAccessDeployCompound());
+                }
+                if (string.IsNullOrEmpty(FBMName))
+                {
+                    DriverWriter = new StreamWriter(Path.Combine(Project.FullName, $"{CP}.i"), append: true);
+                    WriteDriver("CLOSE");
+                    WriteDriver("EXIT");
+                    DriverWriter.Close();
+                    DriverWriter.Dispose();
+                }
+            }
+        }
+
+        #endregion Protected Methods
+
+        #region Private Methods
 
         private static string GetFBMTemplare(string fbm)
         {
@@ -262,435 +692,25 @@ namespace IOCheckoutTool
             };
         }
 
-        protected void CreateCompound()
+        private static int GetIndexes(string[][] Items, string SearchChar)
         {
-            WriteDriver(string.Concat("ADD ", Compound));
-            WriteDriver("TYPE = COMPND ");
-            WriteDriver("ON = 1");
-            WriteDriver("END");
-            Append(DirectAccessCreateCompound());
-            Append(DirectAccessCreateStrategy());
-        }
-
-        protected void Batch()
-        {
-            WriteECB("@echo off");
-            WriteECB("echo This script will enable all hart child ECBs on all CPs.");
-            WriteECB("pause");
-        }
-
-        public void Dispose()
-        {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-        }
-
-        protected virtual void Dispose(bool disposing)
-        {
-            if (disposing)
+            for (int i = 0; i < Items.Length; i++)
             {
-                if (ECBWriter != null)
+                if (Items[i][0].Contains(SearchChar, StringComparison.InvariantCultureIgnoreCase))
                 {
-                    ECBWriter.Close();
-                    ECBWriter.Dispose();
-                }
-                if (DriverWriter != null)
-                {
-                    DriverWriter.Close();
-                    DriverWriter.Dispose();
-                }
-                if (!string.IsNullOrEmpty(FBMName))
-                {
-                    DA.AppendChild(DirectAccessDeployCompound());
-                }
-                if (string.IsNullOrEmpty(FBMName))
-                {
-                    DriverWriter = new StreamWriter(Path.Combine(Project.FullName, string.Concat(CP, ".i")), append: true);
-                    WriteDriver("CLOSE");
-                    WriteDriver("EXIT");
-                    DriverWriter.Close();
-                    DriverWriter.Dispose();
+                    return i;
                 }
             }
+            return -1;
         }
 
-        public virtual void AOUT(int i)
-        {
-            string blockname = string.Concat(FBMName, "_", i.ToString(CultureInfo.InvariantCulture));
-            WriteDriver(string.Concat("ADD ", Compound, ":", blockname));
-            WriteDriver("TYPE = AOUT");
-            WriteDriver(string.Concat("DESCRP = FBM", FBMType));
-            WriteDriver(string.Concat("IOM_ID = ", FBMName));
-            WriteDriver("IOMOPT  = 1");
-            WriteDriver("MA  = 1");
-            WriteDriver(string.Concat("PNT_NO = ", i.ToString(CultureInfo.InvariantCulture)));
-            WriteDriver(string.Concat("MEAS = ", Compound, ":", FBMName, ".PNT_", i.ToString(CultureInfo.InvariantCulture)));
-            WriteDriver("END");
-            Append(DirectAccessCreateBlock(Resources.AOUT, blockname));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "DESCRP", string.Concat("FBM", FBMType)));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "IOM_ID", FBMName));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "IOMOPT", "1"));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "MA", "1"));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "PNT_NO", i.ToString(CultureInfo.InvariantCulture)));
-            Append(DirectAccessCreateBlockAddressCxn(blockname, "MEAS", blockname));
-        }
-
-        public virtual void BIN(int i)
-        {
-            string blockname = string.Concat(ECB, "_", i.ToString(CultureInfo.InvariantCulture));
-            WriteDriver(string.Concat("ADD ", Compound, ":", blockname));
-            WriteDriver("TYPE = BIN");
-            WriteDriver(string.Concat("DESCRP = FBM", FBMType));
-            WriteDriver(string.Concat("IOM_ID = ", blockname));
-            WriteDriver("PNT_NO = DI 20 80");
-            WriteDriver("MA  = 1");
-            WriteDriver("END");
-            Append(DirectAccessCreateBlock(Resources.BIN, blockname));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "DESCRP", string.Concat("FBM", FBMType)));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "IOM_ID", blockname));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "PNT_NO", "DI 20 80"));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "MA", "1"));
-        }
-
-        public virtual void BOUT(int i)
-        {
-            string blockname = string.Concat(ECB, "_", i.ToString(CultureInfo.InvariantCulture));
-            WriteDriver(string.Concat("ADD ", Compound, ":", blockname));
-            WriteDriver("TYPE = BOUT");
-            WriteDriver(string.Concat("DESCRP = FBM", FBMType));
-            WriteDriver(string.Concat("IOM_ID = ", blockname));
-            WriteDriver("MA  = 1");
-            WriteDriver(string.Concat("IN = ", Compound, ":", FBMName, ".CIN_", i.ToString(CultureInfo.InvariantCulture)));
-            WriteDriver("PNT_NO = DO");
-            WriteDriver("END");
-            Append(DirectAccessCreateBlock(Resources.BOUT, blockname));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "DESCRP", string.Concat("FBM", FBMType)));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "IOM_ID", blockname));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "PNT_NO", "DO"));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "MA", "1"));
-            Append(DirectAccessCreateBlockAddressCxn(blockname, "IN", string.Concat(FBMName, ".CIN_", i.ToString(CultureInfo.InvariantCulture))));
-        }
-
-        public virtual void CIN(int i)
-        {
-            string blockname = string.Concat(FBMName, "_", i.ToString(CultureInfo.InvariantCulture));
-            WriteDriver(string.Concat("ADD ", Compound, ":", blockname));
-            WriteDriver("TYPE = CIN");
-            WriteDriver(string.Concat("DESCRP = FBM", FBMType));
-            WriteDriver(string.Concat("IOM_ID = ", FBMName));
-            WriteDriver(string.Concat("PNT_NO = ", i.ToString(CultureInfo.InvariantCulture)));
-            WriteDriver("MA  = 1");
-            WriteDriver("END");
-            Append(DirectAccessCreateBlock(Resources.CIN, blockname));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "DESCRP", string.Concat("FBM", FBMType)));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "IOM_ID", FBMName));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "MA", "1"));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "PNT_NO", i.ToString(CultureInfo.InvariantCulture)));
-        }
-
-        public virtual void COUT(int i)
-        {
-            string blockname = string.Concat(FBMName, "_", i.ToString(CultureInfo.InvariantCulture));
-            WriteDriver(string.Concat("ADD ", Compound, ":", blockname));
-            WriteDriver("TYPE = COUT");
-            WriteDriver(string.Concat("DESCRP = FBM", FBMType));
-            WriteDriver(string.Concat("IOM_ID = ", FBMName));
-            WriteDriver("MA  = 1");
-            WriteDriver(string.Concat("IN = ", Compound, ":", FBMName, ".IN_", i.ToString(CultureInfo.InvariantCulture)));
-            WriteDriver(string.Concat("PNT_NO = ", i.ToString(CultureInfo.InvariantCulture)));
-            WriteDriver("END");
-            Append(DirectAccessCreateBlock(Resources.COUT, blockname));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "DESCRP", string.Concat("FBM", FBMType)));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "IOM_ID", FBMName));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "MA", "1"));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "PNT_NO", i.ToString(CultureInfo.InvariantCulture)));
-            Append(DirectAccessCreateBlockAddressCxn(blockname, "IN", string.Concat(FBMName, ".IN_", i.ToString(CultureInfo.InvariantCulture))));
-        }
-
-        public virtual void CINR(int i)
-        {
-            string blockname = string.Concat(FBMName, "_", i.ToString(CultureInfo.InvariantCulture));
-            WriteDriver(string.Concat("ADD ", Compound, ":", blockname));
-            WriteDriver("TYPE = CINR");
-            WriteDriver(string.Concat("DESCRP = FBM", FBMType));
-            WriteDriver(string.Concat("IOM_ID = ", FBMName));
-            WriteDriver("MA  = 1");
-            WriteDriver(string.Concat("IOMIDR = ", RedundantName));
-            WriteDriver(string.Concat("PNT_NO = ", i.ToString(CultureInfo.InvariantCulture)));
-            WriteDriver("END");
-            Append(DirectAccessCreateBlock(Resources.CINR, blockname));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "DESCRP", string.Concat("FBM", FBMType)));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "IOM_ID", FBMName));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "IOMIDR", RedundantName));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "MA", "1"));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "PNT_NO", i.ToString(CultureInfo.InvariantCulture)));
-        }
-
-        public virtual void COUTR(int i)
-        {
-            string blockname = string.Concat(FBMName, "_", i.ToString(CultureInfo.InvariantCulture));
-            WriteDriver(string.Concat("ADD ", Compound, ":", blockname));
-            WriteDriver("TYPE = COUTR");
-            WriteDriver(string.Concat("DESCRP = FBM", FBMType));
-            WriteDriver(string.Concat("IOM_ID = ", FBMName));
-            WriteDriver(string.Concat("IOMIDR = ", RedundantName));
-            WriteDriver("MA  = 1");
-            WriteDriver(string.Concat("PNT_NO = ", i.ToString(CultureInfo.InvariantCulture)));
-            WriteDriver(string.Concat("IN = ", Compound, ":", FBMName, ".CO_", i.ToString(CultureInfo.InvariantCulture)));
-            WriteDriver("END");
-            Append(DirectAccessCreateBlock(Resources.COUTR, blockname));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "DESCRP", string.Concat("FBM", FBMType)));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "IOM_ID", FBMName));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "MA", "1"));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "PNT_NO", i.ToString(CultureInfo.InvariantCulture)));
-            Append(DirectAccessCreateBlockAddressCxn(blockname, "IN", string.Concat(FBMName, ".CO_", i.ToString(CultureInfo.InvariantCulture))));
-        }
-
-        public virtual void ECB1()
-        {
-            WriteDriver(string.Concat("ADD ", CP, "_ECB:", FBMName));
-            WriteDriver("TYPE = ECB1");
-            WriteDriver(string.Concat("DEV_ID = ", FBMName));
-            WriteDriver(string.Concat("HWTYPE = ", FBMType));
-            WriteDriver("SWTYPE = 1");
-            WriteDriver(string.Concat("CHAN = ", Channel.Replace("CH", "", StringComparison.InvariantCultureIgnoreCase)));
-            WriteDriver("END");
-        }
-
-        public virtual void ECB2()
-        {
-            WriteDriver(string.Concat("ADD ", CP, "_ECB:", FBMName));
-            WriteDriver("TYPE = ECB2");
-            WriteDriver(string.Concat("DEV_ID = ", FBMName));
-            WriteDriver(string.Concat("HWTYPE = ", FBMType));
-            WriteDriver("SWTYPE = 2");
-            WriteDriver(string.Concat("CHAN = ", Channel.Replace("CH", "", StringComparison.InvariantCultureIgnoreCase)));
-            WriteDriver("END");
-        }
-
-        public virtual void ECB4()
-        {
-            WriteDriver(string.Concat("ADD ", CP, "_ECB:", FBMName));
-            WriteDriver("TYPE = ECB4");
-            WriteDriver(string.Concat("DEV_ID = ", FBMName));
-            WriteDriver(string.Concat("HWTYPE = 206"));
-            WriteDriver("SWTYPE = 4");
-            WriteDriver(string.Concat("CHAN = ", Channel.Replace("CH", "", StringComparison.InvariantCultureIgnoreCase)));
-            WriteDriver("END");
-        }
-
-        public virtual void ECB5()
-        {
-            WriteDriver(string.Concat("ADD ", CP, "_ECB:", FBMName));
-            WriteDriver("TYPE = ECB5");
-            WriteDriver(string.Concat("DEV_ID = ", FBMName));
-            WriteDriver(string.Concat("HWTYPE = ", FBMType));
-            WriteDriver("SWTYPE = 5");
-            WriteDriver(string.Concat("CHAN = ", Channel.Replace("CH", "", StringComparison.InvariantCultureIgnoreCase)));
-            WriteDriver("END");
-        }
-
-        public virtual void ECB53()
-        {
-            WriteDriver(string.Concat("ADD ", CP, "_ECB:", FBMName));
-            WriteDriver("TYPE = ECB53");
-            WriteDriver(string.Concat("DEV_ID = ", FBMName));
-            WriteDriver(string.Concat("HWTYPE = ", FBMType));
-            WriteDriver(string.Concat("SWTYPE = ", FBMType));
-            WriteDriver(string.Concat("CHAN = ", Channel.Replace("CH", "", StringComparison.InvariantCultureIgnoreCase)));
-            WriteDriver("END");
-        }
-
-        public virtual void ECB200()
-        {
-            WriteDriver(string.Concat("ADD ", CP, "_ECB:", FBMName));
-            WriteDriver("TYPE = ECB200");
-            WriteDriver(string.Concat("DEV_ID = ", FBMName[..6]));
-            WriteDriver(string.Concat("HWTYPE = ", FBMType));
-            WriteDriver(string.Concat("SWTYPE = ", FBMType));
-            WriteDriver(string.Concat("CHAN = ", Channel.Replace("CH", "", StringComparison.InvariantCultureIgnoreCase)));
-            WriteDriver("END");
-        }
-
-        public virtual void ECB201(int i, string blockktype = "")
-        {
-            string blockname = string.Concat(ECB, "_", i.ToString(CultureInfo.InvariantCulture));
-            string compound = string.Concat(CP, "_ECB");
-            string devid = string.Concat(ECB[1..^0], i.ToString(CultureInfo.InvariantCulture));
-            WriteDriver(string.Concat("ADD ", compound, ":", blockname));
-            WriteDriver("TYPE = ECB201");
-            WriteDriver(string.Concat("DEV_ID = ", devid));
-            WriteDriver(string.Concat("HWTYPE = ", FBMType));
-            WriteDriver(string.Concat("SWTYPE = ", FBMType));
-            WriteDriver(string.Concat("PARENT = ", CP, "_ECB:", FBMName));
-            WriteDriver(string.Concat("DVNAME = CH", i.ToString(CultureInfo.InvariantCulture)));
-            WriteDriver("DVOPTS = 4-20");
-            WriteDriver("END");
-            WriteECB(string.Concat("echo Enabling ", ECB, i.ToString(CultureInfo.InvariantCulture)));
-            WriteECB(string.Concat(OMSET, " -l 1 ", compound, ":", blockname, ".ACTION"));
-            Append(DirectAccessCreateECB(blockname));
-            Append(DirectAccessUpdateECBAttribute(blockname, "DEV_ID", devid));
-            Append(DirectAccessUpdateECBAttribute(blockname, "HWTYPE", FBMType));
-            Append(DirectAccessUpdateECBAttribute(blockname, "SWTYPE", FBMType));
-            Append(DirectAccessUpdateECBAttribute(blockname, "DVNAME", string.Concat("CH", i.ToString(CultureInfo.InvariantCulture))));
-            Append(DirectAccessUpdateECBAttribute(blockname, "DVOPTS", "4-20"));
-        }
-
-        public virtual void ECB202()
-        {
-            WriteDriver(string.Concat("ADD ", CP, "_ECB:", FBMName));
-            WriteDriver("TYPE = ECB202");
-            WriteDriver(string.Concat("DEV_ID = ", FBMName[..6]));
-            WriteDriver(string.Concat("HWTYPE = ", FBMType));
-            WriteDriver(string.Concat("SWTYPE = ", FBMType));
-            WriteDriver(string.Concat("CHAN = ", Channel.Replace("CH", "", StringComparison.InvariantCultureIgnoreCase)));
-            WriteDriver("END");
-        }
-
-        public virtual void MAIN()
-        {
-            WriteDriver(string.Concat("ADD ", Compound, ":", FBMName));
-            WriteDriver("TYPE = MAIN");
-            WriteDriver(string.Concat("DESCRP = FBM", FBMType));
-            WriteDriver("IOMOPT = 2");
-            WriteDriver(string.Concat("IOM_ID = ", FBMName));
-            WriteDriver("MA  = 1");
-            WriteDriver("END");
-            Append(DirectAccessCreateBlock(Resources.MAIN, FBMName));
-            Append(DirectAccessUpdateBlockAttribute(FBMName, "DESCRP", string.Concat("FBM", FBMType)));
-            Append(DirectAccessUpdateBlockAttribute(FBMName, "IOMOPT", "2"));
-            Append(DirectAccessUpdateBlockAttribute(FBMName, "IOM_ID", FBMName));
-            Append(DirectAccessUpdateBlockAttribute(FBMName, "MA", "1"));
-        }
-
-        public virtual void MCIN()
-        {
-            WriteDriver(string.Concat("ADD ", Compound, ":", FBMName));
-            WriteDriver("TYPE = MCIN");
-            WriteDriver(string.Concat("DESCRP = FBM", FBMType));
-            WriteDriver(string.Concat("IOM_ID = ", FBMName));
-            WriteDriver("IOMOPT = 1");
-            WriteDriver("END");
-            Append(DirectAccessCreateBlock(Resources.MCIN, FBMName));
-            Append(DirectAccessUpdateBlockAttribute(FBMName, "DESCRP", string.Concat("FBM", FBMType)));
-            Append(DirectAccessUpdateBlockAttribute(FBMName, "IOM_ID", FBMName));
-            Append(DirectAccessUpdateBlockAttribute(FBMName, "IOMOPT", "1"));
-            Append(DirectAccessUpdateBlockAttribute(FBMName, "MA", "1"));
-        }
-
-        public virtual void MCOUT()
-        {
-            WriteDriver(string.Concat("ADD ", Compound, ":", FBMName));
-            WriteDriver("TYPE = MCOUT");
-            WriteDriver(string.Concat("DESCRP = FBM", FBMType));
-            WriteDriver(string.Concat("IOM_ID = ", FBMName));
-            WriteDriver("IOMOPT = 1");
-            WriteDriver("MA  = 1");
-            WriteDriver("END");
-            Append(DirectAccessCreateBlock(Resources.MCOUT, FBMName));
-            Append(DirectAccessUpdateBlockAttribute(FBMName, "DESCRP", string.Concat("FBM", FBMType)));
-            Append(DirectAccessUpdateBlockAttribute(FBMName, "IOM_ID", FBMName));
-            Append(DirectAccessUpdateBlockAttribute(FBMName, "IOMOPT", "1"));
-            Append(DirectAccessUpdateBlockAttribute(FBMName, "MA", "1"));
-        }
-
-        public virtual void RIN(int i)
-        {
-            string blockname = string.Concat(ECB, "_", i.ToString(CultureInfo.InvariantCulture));
-            WriteDriver(string.Concat("ADD ", Compound, ":", blockname));
-            WriteDriver("TYPE = RIN");
-            WriteDriver(string.Concat("DESCRP = FBM", FBMType));
-            WriteDriver(string.Concat("IOM_ID = ", blockname));
-            WriteDriver("PNT_NO = CURRENT");
-            WriteDriver("SCI = 0");
-            WriteDriver("HSCI1 = 65535");
-            WriteDriver("LSCI1 = 0");
-            WriteDriver("MA  = 1");
-            WriteDriver("END");
-            Append(DirectAccessCreateBlock(Resources.RIN, blockname));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "DESCRP", string.Concat("FBM", FBMType)));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "IOM_ID", iomid));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "PNT_NO", "CURRENT"));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "SCI", "0"));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "HSCI1", "65535"));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "LSCI1", "0"));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "MA", "1"));
-        }
-
-        public virtual void RINR(int i)
-        {
-            string blockname = string.Concat(ECB, "_", i.ToString(CultureInfo.InvariantCulture));
-            string redundantname = string.Concat(RedundantECB, "_", i.ToString(CultureInfo.InvariantCulture));
-            WriteDriver(string.Concat("ADD ", Compound, ":", blockname));
-            WriteDriver("TYPE = RINR");
-            WriteDriver(string.Concat("DESCRP = FBM", FBMType));
-            WriteDriver(string.Concat("IOMID1 = ", blockname));
-            WriteDriver(string.Concat("IOMID2 = ", redundantname));
-            WriteDriver("PNT_NO = CURRENT");
-            WriteDriver("SCI = 0");
-            WriteDriver("HSCI1 = 65535");
-            WriteDriver("LSCI1 = 0");
-            WriteDriver("MA  = 1");
-            WriteDriver("END");
-            Append(DirectAccessCreateBlock(Resources.RINR, blockname));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "DESCRP", string.Concat("FBM", FBMType)));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "IOMID1", blockname));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "IOMID2", redundantname));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "PNT_NO", "CURRENT"));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "SCI", "0"));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "HSCI1", "65535"));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "LSCI1", "0"));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "MA", "1"));
-        }
-
-        public virtual void ROUT(int i)
-        {
-            string blockname = string.Concat(ECB, "_", i.ToString(CultureInfo.InvariantCulture));
-            WriteDriver(string.Concat("ADD ", Compound, ":", blockname));
-            WriteDriver("TYPE = ROUT");
-            WriteDriver(string.Concat("DESCRP = FBM", FBMType));
-            WriteDriver(string.Concat("IOM_ID = ", blockname));
-            WriteDriver("PNT_NO = CURRENT");
-            WriteDriver("SCO = 3");
-            WriteDriver("MA  = 1");
-            WriteDriver(string.Concat("MEAS = ", Compound, ":", FBMName, ".PNT_", i.ToString(CultureInfo.InvariantCulture)));
-            WriteDriver("END");
-            Append(DirectAccessCreateBlock(Resources.ROUT, blockname));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "DESCRP", string.Concat("FBM", FBMType)));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "IOM_ID", blockname));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "PNT_NO", "CURRENT"));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "SCI", "0"));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "MA", "1"));
-            Append(DirectAccessCreateBlockAddressCxn(blockname, "MEAS", string.Concat(FBMName, ".PNT_", i.ToString(CultureInfo.InvariantCulture))));
-        }
-
-        public virtual void ROUTR(int i)
-        {
-            string blockname = string.Concat(ECB, "_", i.ToString(CultureInfo.InvariantCulture));
-            string redundantname = string.Concat(RedundantECB, "_", i.ToString(CultureInfo.InvariantCulture));
-            WriteDriver(string.Concat("ADD ", Compound, ":", blockname));
-            WriteDriver("TYPE = ROUT");
-            WriteDriver(string.Concat("DESCRP = FBM", FBMType));
-            WriteDriver(string.Concat("IOMID1 = ", blockname));
-            WriteDriver(string.Concat("IOMID2 = ", RedundantName));
-            WriteDriver("PNT_NO = CURRENT");
-            WriteDriver("SCO = 3");
-            WriteDriver("MA  = 1");
-            WriteDriver(string.Concat("MEAS = ", Compound, ":", FBMName, ".PNT_", i.ToString(CultureInfo.InvariantCulture)));
-            WriteDriver("END");
-            Append(DirectAccessCreateBlock(Resources.ROUTR, blockname));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "DESCRP", string.Concat("FBM", FBMType)));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "IOMID1", blockname));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "IOMID2", redundantname));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "PNT_NO", "CURRENT"));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "SCI", "0"));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "MA", "1"));
-            Append(DirectAccessCreateBlockAddressCxn(blockname, "MEAS", string.Concat(FBMName, ".PNT_", i.ToString(CultureInfo.InvariantCulture))));
-        }
+        #endregion Private Methods
     }
 
     public class FBM201 : FBM
     {
+        #region Public Methods
+
         public override void Build()
         {
             base.Build();
@@ -704,28 +724,32 @@ namespace IOCheckoutTool
 
         public override void MAIN()
         {
-            WriteDriver(string.Concat("ADD ", Compound, ":", FBMName));
+            WriteDriver($"ADD {Compound}:{FBMName}");
             WriteDriver("TYPE = MAIN");
-            WriteDriver(string.Concat("DESCRP = FBM", FBMType));
-            WriteDriver(string.Concat("IOM_ID = ", FBMName));
+            WriteDriver($"DESCRP = FBM{FBMType}");
+            WriteDriver($"IOM_ID = {FBMName}");
             WriteDriver("IOMOPT = 1");
             Append(DirectAccessCreateBlock(Resources.MAIN, FBMName));
-            Append(DirectAccessUpdateBlockAttribute(FBMName, "DESCRP", string.Concat("FBM", FBMType)));
+            Append(DirectAccessUpdateBlockAttribute(FBMName, "DESCRP", $"FBM{FBMType}"));
             Append(DirectAccessUpdateBlockAttribute(FBMName, "IOM_ID", FBMName));
             Append(DirectAccessUpdateBlockAttribute(FBMName, "IOMOPT", "1"));
             for (int i = 1; i <= 8; ++i)
             {
-                WriteDriver(string.Concat("SCI_", i.ToString(CultureInfo.InvariantCulture), " = 3"));
+                WriteDriver($"SCI_{i.ToString(CultureInfo.InvariantCulture)} = 3");
                 WriteDriver(string.Concat("HSCO", i.ToString(CultureInfo.InvariantCulture), " = 100"));
-                Append(DirectAccessUpdateBlockAttribute(FBMName, string.Concat("SCI_", i.ToString(CultureInfo.InvariantCulture)), "3"));
+                Append(DirectAccessUpdateBlockAttribute(FBMName, $"SCI_{i.ToString(CultureInfo.InvariantCulture)}", "3"));
                 Append(DirectAccessUpdateBlockAttribute(FBMName, string.Concat("HSCO", i.ToString(CultureInfo.InvariantCulture)), "100"));
             }
             WriteDriver("END");
         }
+
+        #endregion Public Methods
     }
 
     public class FBM202 : FBM
     {
+        #region Public Methods
+
         public override void Build()
         {
             base.Build();
@@ -739,22 +763,22 @@ namespace IOCheckoutTool
 
         public override void MAIN()
         {
-            WriteDriver(string.Concat("ADD ", Compound, ":", FBMName));
+            WriteDriver($"ADD {Compound}:{FBMName}");
             WriteDriver("TYPE = MAIN");
-            WriteDriver(string.Concat("DESCRP = FBM", FBMType));
-            WriteDriver(string.Concat("IOM_ID = ", FBMName));
+            WriteDriver($"DESCRP = FBM{FBMType}");
+            WriteDriver($"IOM_ID = {FBMName}");
             WriteDriver("IOMOPT = 1");
             WriteDriver("MA  = 1");
             Append(DirectAccessCreateBlock(Resources.MAIN, FBMName));
-            Append(DirectAccessUpdateBlockAttribute(FBMName, "DESCRP", string.Concat("FBM", FBMType)));
+            Append(DirectAccessUpdateBlockAttribute(FBMName, "DESCRP", $"FBM{FBMType}"));
             Append(DirectAccessUpdateBlockAttribute(FBMName, "IOM_ID", FBMName));
             Append(DirectAccessUpdateBlockAttribute(FBMName, "IOMOPT", "1"));
             for (int i = 1; i <= 8; ++i)
             {
-                WriteDriver(string.Concat("SCI_", i.ToString(CultureInfo.InvariantCulture), " = 24"));
-                WriteDriver(string.Concat("HSCO", i.ToString(CultureInfo.InvariantCulture), " = 100"));
-                Append(DirectAccessUpdateBlockAttribute(FBMName, string.Concat("SCI_", i.ToString(CultureInfo.InvariantCulture)), "24"));
-                Append(DirectAccessUpdateBlockAttribute(FBMName, string.Concat("HSCO", i.ToString(CultureInfo.InvariantCulture)), "100"));
+                WriteDriver($"SCI_{i.ToString(CultureInfo.InvariantCulture)} = 24");
+                WriteDriver($"HSCO{i.ToString(CultureInfo.InvariantCulture)} = 100");
+                Append(DirectAccessUpdateBlockAttribute(FBMName, $"SCI_{i.ToString(CultureInfo.InvariantCulture)}", "24"));
+                Append(DirectAccessUpdateBlockAttribute(FBMName, $"HSCO{i.ToString(CultureInfo.InvariantCulture)}", "100"));
             }
             WriteDriver("KSCALE = 1.8");
             WriteDriver("BSCALE = 32");
@@ -763,10 +787,14 @@ namespace IOCheckoutTool
             Append(DirectAccessUpdateBlockAttribute(FBMName, "BSCALE", "32"));
             Append(DirectAccessUpdateBlockAttribute(FBMName, "MA", "1"));
         }
+
+        #endregion Public Methods
     }
 
     public class FBM203 : FBM
     {
+        #region Public Methods
+
         public override void Build()
         {
             base.Build();
@@ -780,22 +808,22 @@ namespace IOCheckoutTool
 
         public override void MAIN()
         {
-            WriteDriver(string.Concat("ADD ", Compound, ":", FBMName));
+            WriteDriver($"ADD {Compound}:{FBMName}");
             WriteDriver("TYPE = MAIN");
-            WriteDriver(string.Concat("DESCRP = FBM", FBMType));
-            WriteDriver(string.Concat("IOM_ID = ", FBMName));
+            WriteDriver($"DESCRP = FBM{FBMType}");
+            WriteDriver($"IOM_ID = {FBMName}");
             WriteDriver("IOMOPT = 1");
             WriteDriver("MA  = 1");
             Append(DirectAccessCreateBlock(Resources.MAIN, FBMName));
-            Append(DirectAccessUpdateBlockAttribute(FBMName, "DESCRP", string.Concat("FBM", FBMType)));
+            Append(DirectAccessUpdateBlockAttribute(FBMName, "DESCRP", $"FBM{FBMType}"));
             Append(DirectAccessUpdateBlockAttribute(FBMName, "IOM_ID", FBMName));
             Append(DirectAccessUpdateBlockAttribute(FBMName, "IOMOPT", "1"));
             for (int i = 1; i <= 8; ++i)
             {
-                WriteDriver(string.Concat("SCI_", i.ToString(CultureInfo.InvariantCulture), " = 24"));
-                WriteDriver(string.Concat("HSCO", i.ToString(CultureInfo.InvariantCulture), " = 100"));
-                Append(DirectAccessUpdateBlockAttribute(FBMName, string.Concat("SCI_", i.ToString(CultureInfo.InvariantCulture)), "24"));
-                Append(DirectAccessUpdateBlockAttribute(FBMName, string.Concat("HSCO", i.ToString(CultureInfo.InvariantCulture)), "100"));
+                WriteDriver($"SCI_{i.ToString(CultureInfo.InvariantCulture)} = 24");
+                WriteDriver($"HSCO{i.ToString(CultureInfo.InvariantCulture)} = 100");
+                Append(DirectAccessUpdateBlockAttribute(FBMName, $"SCI_{i.ToString(CultureInfo.InvariantCulture)}", "24"));
+                Append(DirectAccessUpdateBlockAttribute(FBMName, $"HSCO{i.ToString(CultureInfo.InvariantCulture)}", "100"));
             }
             WriteDriver("KSCALE = 1.8");
             WriteDriver("BSCALE = 32");
@@ -804,10 +832,36 @@ namespace IOCheckoutTool
             Append(DirectAccessUpdateBlockAttribute(FBMName, "BSCALE", "32"));
             Append(DirectAccessUpdateBlockAttribute(FBMName, "MA", "1"));
         }
+
+        #endregion Public Methods
     }
 
     public class FBM204 : FBM
     {
+        #region Public Methods
+
+        public override void AOUT(int i)
+        {
+            string blockname = $"{FBMName}{i.ToString(CultureInfo.InvariantCulture)}";
+            string mainconnection = string.Concat(Compound, ":", FBMName, ".PNT_", i.ToString(CultureInfo.InvariantCulture));
+            WriteDriver($"ADD {Compound}:{blockname}");
+            WriteDriver("TYPE = AOUT");
+            WriteDriver($"DESCRP = FBM{FBMType}");
+            WriteDriver($"IOM_ID = {FBMName}");
+            WriteDriver("IOMOPT  = 1");
+            WriteDriver("MA  = 1");
+            WriteDriver($"PNT_NO = {i.ToString(CultureInfo.InvariantCulture)}");
+            WriteDriver(string.Concat("MEAS = ", mainconnection));
+            WriteDriver("END");
+            Append(DirectAccessCreateBlock(Resources.AOUT, blockname));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "DESCRP", $"FBM{FBMType}"));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "IOM_ID", FBMName));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "IOMOPT", "1"));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "MA", "1"));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "PNT_NO", i.ToString(CultureInfo.InvariantCulture)));
+            Append(DirectAccessCreateBlockAddressCxn(blockname, "MEAS", mainconnection.Replace(Compound, "", StringComparison.InvariantCultureIgnoreCase)));
+        }
+
         public override void Build()
         {
             base.Build();
@@ -823,60 +877,42 @@ namespace IOCheckoutTool
             ECBWriter.Dispose();
         }
 
-        public override void AOUT(int i)
-        {
-            string blockname = string.Concat(FBMName, "_", i.ToString(CultureInfo.InvariantCulture));
-            string mainconnection = string.Concat(Compound, ":", FBMName, ".PNT_", i.ToString(CultureInfo.InvariantCulture));
-            WriteDriver(string.Concat("ADD ", Compound, ":", blockname));
-            WriteDriver("TYPE = AOUT");
-            WriteDriver(string.Concat("DESCRP = FBM", FBMType));
-            WriteDriver(string.Concat("IOM_ID = ", FBMName));
-            WriteDriver("IOMOPT  = 1");
-            WriteDriver("MA  = 1");
-            WriteDriver(string.Concat("PNT_NO = ", i.ToString(CultureInfo.InvariantCulture)));
-            WriteDriver(string.Concat("MEAS = ", mainconnection));
-            WriteDriver("END");
-            Append(DirectAccessCreateBlock(Resources.AOUT, blockname));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "DESCRP", string.Concat("FBM", FBMType)));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "IOM_ID", FBMName));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "IOMOPT", "1"));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "MA", "1"));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "PNT_NO", i.ToString(CultureInfo.InvariantCulture)));
-            Append(DirectAccessCreateBlockAddressCxn(blockname, "MEAS", mainconnection.Replace(Compound, "", StringComparison.InvariantCultureIgnoreCase)));
-        }
-
         public override void MAIN()
         {
             string main = FBMName;
             WriteDriver(string.Concat("ADD ", Compound, ":", main));
             WriteDriver("TYPE = MAIN");
-            WriteDriver(string.Concat("DESCRP = FBM", FBMType));
+            WriteDriver($"DESCRP = FBM{FBMType}");
             WriteDriver("IOMOPT = 1");
-            WriteDriver(string.Concat("IOM_ID = ", FBMName));
+            WriteDriver($"IOM_ID = {FBMName}");
             Append(DirectAccessCreateBlock(Resources.MAIN, FBMName));
-            Append(DirectAccessUpdateBlockAttribute(main, "DESCRP", string.Concat("FBM", FBMType)));
+            Append(DirectAccessUpdateBlockAttribute(main, "DESCRP", $"FBM{FBMType}"));
             Append(DirectAccessUpdateBlockAttribute(main, "IOMOPT", "1"));
             Append(DirectAccessUpdateBlockAttribute(main, "IOM_ID", FBMName));
             for (int i = 1; i <= 4; ++i)
             {
-                WriteDriver(string.Concat("SCI_", i.ToString(CultureInfo.InvariantCulture), " = 3"));
+                WriteDriver($"SCI_{i.ToString(CultureInfo.InvariantCulture)} = 3");
                 WriteDriver(string.Concat("HSCO", i.ToString(CultureInfo.InvariantCulture), " = 100"));
-                Append(DirectAccessUpdateBlockAttribute(main, string.Concat("SCI_", i.ToString(CultureInfo.InvariantCulture)), "3"));
+                Append(DirectAccessUpdateBlockAttribute(main, $"SCI_{i.ToString(CultureInfo.InvariantCulture)}", "3"));
                 Append(DirectAccessUpdateBlockAttribute(main, string.Concat("HSCO", i.ToString(CultureInfo.InvariantCulture)), "100"));
             }
             for (int i = 5; i <= 8; ++i)
             {
-                string blockname = string.Concat(FBMName, "_", i.ToString(CultureInfo.InvariantCulture));
+                string blockname = $"{FBMName}{i.ToString(CultureInfo.InvariantCulture)}";
                 WriteDriver(string.Concat("MEAS_", i.ToString(CultureInfo.InvariantCulture), " = ", Compound, ":", blockname, ".OUT"));
-                Append(DirectAccessCreateBlockAddressCxn(main, string.Concat("MEAS_", i.ToString(CultureInfo.InvariantCulture)), string.Concat(blockname, ".OUT")));
+                Append(DirectAccessCreateBlockAddressCxn(main, $"MEAS_{i.ToString(CultureInfo.InvariantCulture)}", string.Concat(blockname, ".OUT")));
             }
             Append(DirectAccessUpdateBlockAttribute(FBMName, "MA", "1"));
             WriteDriver("END");
         }
+
+        #endregion Public Methods
     }
 
     public class FBM206 : FBM
     {
+        #region Public Methods
+
         public override void Build()
         {
             base.Build();
@@ -893,12 +929,12 @@ namespace IOCheckoutTool
             string main = FBMName;
             WriteDriver(string.Concat("ADD ", Compound, ":", main));
             WriteDriver("TYPE = MAIN");
-            WriteDriver(string.Concat("DESCRP = FBM", FBMType));
+            WriteDriver($"DESCRP = FBM{FBMType}");
             WriteDriver("IOMOPT = 1");
-            WriteDriver(string.Concat("IOM_ID = ", FBMName));
+            WriteDriver($"IOM_ID = {FBMName}");
             WriteDriver(string.Concat("MA = 1"));
             Append(DirectAccessCreateBlock(Resources.MAIN, FBMName));
-            Append(DirectAccessUpdateBlockAttribute(main, "DESCRP", string.Concat("FBM", FBMType)));
+            Append(DirectAccessUpdateBlockAttribute(main, "DESCRP", $"FBM{FBMType}"));
             Append(DirectAccessUpdateBlockAttribute(main, "IOMOPT", "1"));
             Append(DirectAccessUpdateBlockAttribute(main, "IOM_ID", FBMName));
             Append(DirectAccessUpdateBlockAttribute(FBMName, "MA", "1"));
@@ -906,15 +942,41 @@ namespace IOCheckoutTool
             {
                 WriteDriver(string.Concat("SCI_", i.ToString(CultureInfo.InvariantCulture), " = 8"));
                 WriteDriver(string.Concat("HSCO", i.ToString(CultureInfo.InvariantCulture), " = 100"));
-                Append(DirectAccessUpdateBlockAttribute(main, string.Concat("SCI_", i.ToString(CultureInfo.InvariantCulture)), "8"));
+                Append(DirectAccessUpdateBlockAttribute(main, $"SCI_{i.ToString(CultureInfo.InvariantCulture)}", "8"));
                 Append(DirectAccessUpdateBlockAttribute(main, string.Concat("HSCO", i.ToString(CultureInfo.InvariantCulture)), "100"));
             }
             WriteDriver("END");
         }
+
+        #endregion Public Methods
     }
 
     public class FBM206B : FBM
     {
+        #region Public Methods
+
+        public override void AOUT(int i)
+        {
+            string blockname = $"{FBMName}{i.ToString(CultureInfo.InvariantCulture)}";
+            string mainconnection = string.Concat(Compound, ":", FBMName, ".PNT_", i.ToString(CultureInfo.InvariantCulture));
+            WriteDriver($"ADD {Compound}:{blockname}");
+            WriteDriver("TYPE = AOUT");
+            WriteDriver($"DESCRP = FBM{FBMType}");
+            WriteDriver($"IOM_ID = {FBMName}");
+            WriteDriver("IOMOPT  = 1");
+            WriteDriver("MA  = 1");
+            WriteDriver($"PNT_NO = {i.ToString(CultureInfo.InvariantCulture)}");
+            WriteDriver(string.Concat("MEAS = ", mainconnection));
+            WriteDriver("END");
+            Append(DirectAccessCreateBlock(Resources.AOUT, blockname));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "DESCRP", $"FBM{FBMType}"));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "IOM_ID", FBMName));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "IOMOPT", "1"));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "MA", "1"));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "PNT_NO", i.ToString(CultureInfo.InvariantCulture)));
+            Append(DirectAccessCreateBlockAddressCxn(blockname, "MEAS", mainconnection.Replace(Compound, "", StringComparison.InvariantCultureIgnoreCase)));
+        }
+
         public override void Build()
         {
             base.Build();
@@ -930,39 +992,17 @@ namespace IOCheckoutTool
             ECBWriter.Dispose();
         }
 
-        public override void AOUT(int i)
-        {
-            string blockname = string.Concat(FBMName, "_", i.ToString(CultureInfo.InvariantCulture));
-            string mainconnection = string.Concat(Compound, ":", FBMName, ".PNT_", i.ToString(CultureInfo.InvariantCulture));
-            WriteDriver(string.Concat("ADD ", Compound, ":", blockname));
-            WriteDriver("TYPE = AOUT");
-            WriteDriver(string.Concat("DESCRP = FBM", FBMType));
-            WriteDriver(string.Concat("IOM_ID = ", FBMName));
-            WriteDriver("IOMOPT  = 1");
-            WriteDriver("MA  = 1");
-            WriteDriver(string.Concat("PNT_NO = ", i.ToString(CultureInfo.InvariantCulture)));
-            WriteDriver(string.Concat("MEAS = ", mainconnection));
-            WriteDriver("END");
-            Append(DirectAccessCreateBlock(Resources.AOUT, blockname));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "DESCRP", string.Concat("FBM", FBMType)));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "IOM_ID", FBMName));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "IOMOPT", "1"));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "MA", "1"));
-            Append(DirectAccessUpdateBlockAttribute(blockname, "PNT_NO", i.ToString(CultureInfo.InvariantCulture)));
-            Append(DirectAccessCreateBlockAddressCxn(blockname, "MEAS", mainconnection.Replace(Compound, "", StringComparison.InvariantCultureIgnoreCase)));
-        }
-
         public override void MAIN()
         {
             string main = FBMName;
             WriteDriver(string.Concat("ADD ", Compound, ":", main));
             WriteDriver("TYPE = MAIN");
-            WriteDriver(string.Concat("DESCRP = FBM", FBMType));
+            WriteDriver($"DESCRP = FBM{FBMType}");
             WriteDriver("IOMOPT = 1");
-            WriteDriver(string.Concat("IOM_ID = ", FBMName));
+            WriteDriver($"IOM_ID = {FBMName}");
             WriteDriver(string.Concat("MA = 1"));
             Append(DirectAccessCreateBlock(Resources.MAIN, FBMName));
-            Append(DirectAccessUpdateBlockAttribute(main, "DESCRP", string.Concat("FBM", FBMType)));
+            Append(DirectAccessUpdateBlockAttribute(main, "DESCRP", $"FBM{FBMType}"));
             Append(DirectAccessUpdateBlockAttribute(main, "IOMOPT", "1"));
             Append(DirectAccessUpdateBlockAttribute(main, "IOM_ID", FBMName));
             Append(DirectAccessUpdateBlockAttribute(FBMName, "MA", "1"));
@@ -970,21 +1010,25 @@ namespace IOCheckoutTool
             {
                 WriteDriver(string.Concat("SCI_", i.ToString(CultureInfo.InvariantCulture), " = 8"));
                 WriteDriver(string.Concat("HSCO", i.ToString(CultureInfo.InvariantCulture), " = 100"));
-                Append(DirectAccessUpdateBlockAttribute(main, string.Concat("SCI_", i.ToString(CultureInfo.InvariantCulture)), "8"));
+                Append(DirectAccessUpdateBlockAttribute(main, $"SCI_{i.ToString(CultureInfo.InvariantCulture)}", "8"));
                 Append(DirectAccessUpdateBlockAttribute(main, string.Concat("HSCO", i.ToString(CultureInfo.InvariantCulture)), "100"));
             }
             for (int i = 5; i <= 8; ++i)
             {
-                string blockname = string.Concat(FBMName, "_", i.ToString(CultureInfo.InvariantCulture));
+                string blockname = $"{FBMName}{i.ToString(CultureInfo.InvariantCulture)}";
                 WriteDriver(string.Concat("MEAS_", i.ToString(CultureInfo.InvariantCulture), " = ", Compound, ":", blockname, ".OUT"));
-                Append(DirectAccessCreateBlockAddressCxn(main, string.Concat("MEAS_", i.ToString(CultureInfo.InvariantCulture)), string.Concat(blockname, ".OUT")));
+                Append(DirectAccessCreateBlockAddressCxn(main, $"MEAS_{i.ToString(CultureInfo.InvariantCulture)}", string.Concat(blockname, ".OUT")));
             }
             WriteDriver("END");
         }
+
+        #endregion Public Methods
     }
 
     public class FBM207 : FBM
     {
+        #region Public Methods
+
         public override void Build()
         {
             base.Build();
@@ -995,10 +1039,14 @@ namespace IOCheckoutTool
             ECBWriter.Close();
             ECBWriter.Dispose();
         }
+
+        #endregion Public Methods
     }
 
     public class FBM214 : FBM
     {
+        #region Public Methods
+
         public override void Build()
         {
             base.Build();
@@ -1017,28 +1065,32 @@ namespace IOCheckoutTool
 
         public override void MAIN()
         {
-            WriteDriver(string.Concat("ADD ", Compound, ":", FBMName));
+            WriteDriver($"ADD {Compound}:{FBMName}");
             WriteDriver("TYPE = MAIN");
-            WriteDriver(string.Concat("DESCRP = FBM", FBMType));
+            WriteDriver($"DESCRP = FBM{FBMType}");
             WriteDriver("IOMOPT = 0");
             WriteDriver("MA  = 1");
             Append(DirectAccessCreateBlock(Resources.MAIN, FBMName));
-            Append(DirectAccessUpdateBlockAttribute(FBMName, "DESCRP", string.Concat("FBM", FBMType)));
+            Append(DirectAccessUpdateBlockAttribute(FBMName, "DESCRP", $"FBM{FBMType}"));
             Append(DirectAccessUpdateBlockAttribute(FBMName, "IOMOPT", "0"));
             for (int i = 1; i <= 8; ++i)
             {
-                WriteDriver(string.Concat("SCI_", i.ToString(CultureInfo.InvariantCulture), " = 3"));
-                WriteDriver(string.Concat("MEAS_", i.ToString(CultureInfo.InvariantCulture), " = ", Compound, ":", base.ECB, "_", i.ToString(CultureInfo.InvariantCulture), ".MEAS"));
-                Append(DirectAccessUpdateBlockAttribute(FBMName, string.Concat("SCI_", i.ToString(CultureInfo.InvariantCulture)), "3"));
-                Append(DirectAccessCreateBlockAddressCxn(FBMName, string.Concat("MEAS_", i.ToString(CultureInfo.InvariantCulture)), string.Concat(base.ECB, "_", i.ToString(CultureInfo.InvariantCulture), ".MEAS")));
+                WriteDriver($"SCI_{i.ToString(CultureInfo.InvariantCulture)} = 3");
+                WriteDriver($"MEAS_{i.ToString(CultureInfo.InvariantCulture)} = {Compound}:{ECB}{i.ToString(CultureInfo.InvariantCulture)}.MEAS");
+                Append(DirectAccessUpdateBlockAttribute(FBMName, $"SCI_{i.ToString(CultureInfo.InvariantCulture)}", "3"));
+                Append(DirectAccessCreateBlockAddressCxn(FBMName, $"MEAS_{i.ToString(CultureInfo.InvariantCulture)}", $"{ECB}{i.ToString(CultureInfo.InvariantCulture)}.MEAS"));
             }
             Append(DirectAccessUpdateBlockAttribute(FBMName, "MA", "1"));
             WriteDriver("END");
         }
+
+        #endregion Public Methods
     }
 
     public class FBM214B : FBM
     {
+        #region Public Methods
+
         public override void Build()
         {
             base.Build();
@@ -1057,28 +1109,32 @@ namespace IOCheckoutTool
 
         public override void MAIN()
         {
-            WriteDriver(string.Concat("ADD ", Compound, ":", FBMName));
+            WriteDriver($"ADD {Compound}:{FBMName}");
             WriteDriver("TYPE = MAIN");
-            WriteDriver(string.Concat("DESCRP = FBM", FBMType));
+            WriteDriver($"DESCRP = FBM{FBMType}");
             WriteDriver("IOMOPT = 0");
             WriteDriver("MA  = 1");
             Append(DirectAccessCreateBlock(Resources.MAIN, FBMName));
-            Append(DirectAccessUpdateBlockAttribute(FBMName, "DESCRP", string.Concat("FBM", FBMType)));
+            Append(DirectAccessUpdateBlockAttribute(FBMName, "DESCRP", $"FBM{FBMType}"));
             Append(DirectAccessUpdateBlockAttribute(FBMName, "IOMOPT", "0"));
             for (int i = 1; i <= 8; ++i)
             {
-                WriteDriver(string.Concat("SCI_", i.ToString(CultureInfo.InvariantCulture), " = 3"));
-                WriteDriver(string.Concat("MEAS_", i.ToString(CultureInfo.InvariantCulture), " = ", Compound, ":", base.ECB, "_", i.ToString(CultureInfo.InvariantCulture), ".MEAS"));
-                Append(DirectAccessUpdateBlockAttribute(FBMName, string.Concat("SCI_", i.ToString(CultureInfo.InvariantCulture)), "3"));
-                Append(DirectAccessCreateBlockAddressCxn(FBMName, string.Concat("MEAS_", i.ToString(CultureInfo.InvariantCulture)), string.Concat(base.ECB, "_", i.ToString(CultureInfo.InvariantCulture), ".MEAS")));
+                WriteDriver($"SCI_{i.ToString(CultureInfo.InvariantCulture)} = 3");
+                WriteDriver($"MEAS_{i.ToString(CultureInfo.InvariantCulture)} = {Compound}:{ECB}{i.ToString(CultureInfo.InvariantCulture)}.MEAS");
+                Append(DirectAccessUpdateBlockAttribute(FBMName, $"SCI_{i.ToString(CultureInfo.InvariantCulture)}", "3"));
+                Append(DirectAccessCreateBlockAddressCxn(FBMName, $"MEAS_{i.ToString(CultureInfo.InvariantCulture)}", $"{ECB}{i.ToString(CultureInfo.InvariantCulture)}.MEAS"));
             }
             Append(DirectAccessUpdateBlockAttribute(FBMName, "MA", "1"));
             WriteDriver("END");
         }
+
+        #endregion Public Methods
     }
 
     public class FBM215 : FBM
     {
+        #region Public Methods
+
         public override void Build()
         {
             base.Build();
@@ -1094,10 +1150,14 @@ namespace IOCheckoutTool
             ECBWriter.Close();
             ECBWriter.Dispose();
         }
+
+        #endregion Public Methods
     }
 
     public class FBM216 : FBM
     {
+        #region Public Methods
+
         public override void Build()
         {
             base.Build();
@@ -1116,28 +1176,32 @@ namespace IOCheckoutTool
 
         public override void MAIN()
         {
-            WriteDriver(string.Concat("ADD ", Compound, ":", FBMName));
+            WriteDriver($"ADD {Compound}:{FBMName}");
             WriteDriver("TYPE = MAIN");
-            WriteDriver(string.Concat("DESCRP = FBM", FBMType));
+            WriteDriver($"DESCRP = FBM{FBMType}");
             WriteDriver("IOMOPT = 0");
             WriteDriver("MA  = 1");
             Append(DirectAccessCreateBlock(Resources.MAIN, FBMName));
-            Append(DirectAccessUpdateBlockAttribute(FBMName, "DESCRP", string.Concat("FBM", FBMType)));
+            Append(DirectAccessUpdateBlockAttribute(FBMName, "DESCRP", $"FBM{FBMType}"));
             Append(DirectAccessUpdateBlockAttribute(FBMName, "IOMOPT", "0"));
             for (int i = 1; i <= 8; ++i)
             {
-                WriteDriver(string.Concat("SCI_", i.ToString(CultureInfo.InvariantCulture), " = 3"));
-                WriteDriver(string.Concat("MEAS_", i.ToString(CultureInfo.InvariantCulture), " = ", Compound, ":", base.ECB, "_", i.ToString(CultureInfo.InvariantCulture), ".MEAS"));
-                Append(DirectAccessUpdateBlockAttribute(FBMName, string.Concat("SCI_", i.ToString(CultureInfo.InvariantCulture)), "3"));
-                Append(DirectAccessCreateBlockAddressCxn(FBMName, string.Concat("MEAS_", i.ToString(CultureInfo.InvariantCulture)), string.Concat(base.ECB, "_", i.ToString(CultureInfo.InvariantCulture), ".MEAS")));
+                WriteDriver($"SCI_{i.ToString(CultureInfo.InvariantCulture)} = 3");
+                WriteDriver($"MEAS_{i.ToString(CultureInfo.InvariantCulture)} = {Compound}:{ECB}{i.ToString(CultureInfo.InvariantCulture)}.MEAS");
+                Append(DirectAccessUpdateBlockAttribute(FBMName, $"SCI_{i.ToString(CultureInfo.InvariantCulture)}", "3"));
+                Append(DirectAccessCreateBlockAddressCxn(FBMName, $"MEAS_{i.ToString(CultureInfo.InvariantCulture)}", $"{ECB}{i.ToString(CultureInfo.InvariantCulture)}.MEAS"));
             }
             Append(DirectAccessUpdateBlockAttribute(FBMName, "MA", "1"));
             WriteDriver("END");
         }
+
+        #endregion Public Methods
     }
 
     public class FBM217 : FBM
     {
+        #region Public Methods
+
         public override void Build()
         {
             base.Build();
@@ -1148,14 +1212,22 @@ namespace IOCheckoutTool
             ECBWriter.Close();
             ECBWriter.Dispose();
         }
+
+        #endregion Public Methods
     }
 
     public class FBM217R : FBM
     {
+        #region Public Constructors
+
         public FBM217R(string redundant)
         {
             base.RedundantName = redundant;
         }
+
+        #endregion Public Constructors
+
+        #region Public Methods
 
         public override void Build()
         {
@@ -1174,46 +1246,50 @@ namespace IOCheckoutTool
 
         public override void ECB5()
         {
-            WriteDriver(string.Concat("ADD ", CP, "_ECB:", FBMName));
+            WriteDriver($"ADD {CP}_ECB:{FBMName}");
             WriteDriver("TYPE = ECB5");
-            WriteDriver(string.Concat("DEV_ID = ", FBMName));
-            WriteDriver(string.Concat("HWTYPE = ", FBMType));
+            WriteDriver($"DEV_ID = {FBMName}");
+            WriteDriver($"HWTYPE = {FBMType}");
             WriteDriver("SWTYPE = 5");
-            WriteDriver(string.Concat("CHAN = ", Channel.Replace("CH", "", StringComparison.InvariantCultureIgnoreCase)));
+            WriteDriver($"CHAN = {Channel.Replace("CH ", "", StringComparison.InvariantCultureIgnoreCase)}");
             WriteDriver("END");
             WriteDriver(string.Concat("ADD ", CP, "_ECB:", RedundantName));
             WriteDriver("TYPE = ECB5");
             WriteDriver(string.Concat("DEV_ID = ", RedundantName));
-            WriteDriver(string.Concat("HWTYPE = ", FBMType));
+            WriteDriver($"HWTYPE = {FBMType}");
             WriteDriver("SWTYPE = 5");
-            WriteDriver(string.Concat("CHAN = ", Channel.Replace("CH", "", StringComparison.InvariantCultureIgnoreCase)));
+            WriteDriver($"CHAN = {Channel.Replace("CH ", "", StringComparison.InvariantCultureIgnoreCase)}");
             WriteDriver("END");
         }
 
         public override void MCOUT()
         {
-            WriteDriver(string.Concat("ADD ", Compound, ":", FBMName));
+            WriteDriver($"ADD {Compound}:{FBMName}");
             string blockname;
             WriteDriver("TYPE = MCOUT");
-            WriteDriver(string.Concat("DESCRP = FBM", FBMType));
+            WriteDriver($"DESCRP = FBM{FBMType}");
             WriteDriver("IOMOPT = 0");
             WriteDriver("MA  = 1");
             Append(DirectAccessCreateBlock(Resources.MCOUT, FBMName));
-            Append(DirectAccessUpdateBlockAttribute(FBMName, "DESCRP", string.Concat("FBM", FBMType)));
+            Append(DirectAccessUpdateBlockAttribute(FBMName, "DESCRP", $"FBM{FBMType}"));
             Append(DirectAccessUpdateBlockAttribute(FBMName, "IOM_ID", FBMName));
             Append(DirectAccessUpdateBlockAttribute(FBMName, "IOMOPT", "1"));
             Append(DirectAccessUpdateBlockAttribute(FBMName, "MA", "1"));
             for (int i = 1; i <= 32; ++i)
             {
-                blockname = string.Concat(FBMName, "_", i.ToString(CultureInfo.InvariantCulture));
+                blockname = $"{FBMName}{i.ToString(CultureInfo.InvariantCulture)}";
                 WriteDriver(string.Concat("IN_", i.ToString(CultureInfo.InvariantCulture), " = ", Compound, ":", blockname, ".CIN"));
             }
             WriteDriver("END");
         }
+
+        #endregion Public Methods
     }
 
     public class FBM218 : FBM
     {
+        #region Public Methods
+
         public override void Build()
         {
             base.Build();
@@ -1229,10 +1305,14 @@ namespace IOCheckoutTool
             ECBWriter.Close();
             ECBWriter.Dispose();
         }
+
+        #endregion Public Methods
     }
 
     public class FBM220 : FBM
     {
+        #region Public Methods
+
         public override void Build()
         {
             base.Build();
@@ -1242,10 +1322,14 @@ namespace IOCheckoutTool
             ECBWriter.Close();
             ECBWriter.Dispose();
         }
+
+        #endregion Public Methods
     }
 
     public class FBM221 : FBM
     {
+        #region Public Methods
+
         public override void Build()
         {
             base.Build();
@@ -1255,10 +1339,14 @@ namespace IOCheckoutTool
             ECBWriter.Close();
             ECBWriter.Dispose();
         }
+
+        #endregion Public Methods
     }
 
     public class FBM223 : FBM
     {
+        #region Public Methods
+
         public override void Build()
         {
             base.Build();
@@ -1268,10 +1356,14 @@ namespace IOCheckoutTool
             ECBWriter.Close();
             ECBWriter.Dispose();
         }
+
+        #endregion Public Methods
     }
 
     public class FBM224 : FBM
     {
+        #region Public Methods
+
         public override void Build()
         {
             base.Build();
@@ -1281,10 +1373,14 @@ namespace IOCheckoutTool
             ECBWriter.Close();
             ECBWriter.Dispose();
         }
+
+        #endregion Public Methods
     }
 
     public class FBM228 : FBM
     {
+        #region Public Methods
+
         public override void Build()
         {
             base.Build();
@@ -1294,10 +1390,14 @@ namespace IOCheckoutTool
             ECBWriter.Close();
             ECBWriter.Dispose();
         }
+
+        #endregion Public Methods
     }
 
     public class FBM230 : FBM
     {
+        #region Public Methods
+
         public override void Build()
         {
             base.Build();
@@ -1307,10 +1407,14 @@ namespace IOCheckoutTool
             ECBWriter.Close();
             ECBWriter.Dispose();
         }
+
+        #endregion Public Methods
     }
 
     public class FBM231 : FBM
     {
+        #region Public Methods
+
         public override void Build()
         {
             base.Build();
@@ -1320,10 +1424,14 @@ namespace IOCheckoutTool
             ECBWriter.Close();
             ECBWriter.Dispose();
         }
+
+        #endregion Public Methods
     }
 
     public class FBM232 : FBM
     {
+        #region Public Methods
+
         public override void Build()
         {
             base.Build();
@@ -1333,10 +1441,14 @@ namespace IOCheckoutTool
             ECBWriter.Close();
             ECBWriter.Dispose();
         }
+
+        #endregion Public Methods
     }
 
     public class FBM233 : FBM
     {
+        #region Public Methods
+
         public override void Build()
         {
             base.Build();
@@ -1346,10 +1458,14 @@ namespace IOCheckoutTool
             ECBWriter.Close();
             ECBWriter.Dispose();
         }
+
+        #endregion Public Methods
     }
 
     public class FBM237 : FBM
     {
+        #region Public Methods
+
         public override void Build()
         {
             base.Build();
@@ -1367,28 +1483,32 @@ namespace IOCheckoutTool
 
         public override void MAIN()
         {
-            WriteDriver(string.Concat("ADD ", Compound, ":", FBMName));
+            WriteDriver($"ADD {Compound}:{FBMName}");
             WriteDriver("TYPE = MAIN");
-            WriteDriver(string.Concat("DESCRP = FBM", FBMType));
+            WriteDriver($"DESCRP = FBM{FBMType}");
             WriteDriver("IOMOPT = 0");
             WriteDriver("MA = 1");
             Append(DirectAccessCreateBlock(Resources.MAIN, FBMName));
-            Append(DirectAccessUpdateBlockAttribute(FBMName, "DESCRP", string.Concat("FBM", FBMType)));
+            Append(DirectAccessUpdateBlockAttribute(FBMName, "DESCRP", $"FBM{FBMType}"));
             Append(DirectAccessUpdateBlockAttribute(FBMName, "IOMOPT", "0"));
             for (int i = 1; i <= 8; ++i)
             {
-                WriteDriver(string.Concat("SCI_", i.ToString(CultureInfo.InvariantCulture), " = 3"));
-                WriteDriver(string.Concat("MEAS_", i.ToString(CultureInfo.InvariantCulture), " = ", Compound, ":", base.ECB, "_", i.ToString(CultureInfo.InvariantCulture), ".MEAS"));
-                Append(DirectAccessUpdateBlockAttribute(FBMName, string.Concat("SCI_", i.ToString(CultureInfo.InvariantCulture)), "3"));
-                Append(DirectAccessCreateBlockAddressCxn(FBMName, string.Concat("MEAS_", i.ToString(CultureInfo.InvariantCulture)), string.Concat(base.ECB, "_", i.ToString(CultureInfo.InvariantCulture), ".MEAS")));
+                WriteDriver($"SCI_{i.ToString(CultureInfo.InvariantCulture)} = 3");
+                WriteDriver($"MEAS_{i.ToString(CultureInfo.InvariantCulture)} = {Compound}:{ECB}{i.ToString(CultureInfo.InvariantCulture)}.MEAS");
+                Append(DirectAccessUpdateBlockAttribute(FBMName, $"SCI_{i.ToString(CultureInfo.InvariantCulture)}", "3"));
+                Append(DirectAccessCreateBlockAddressCxn(FBMName, $"MEAS_{i.ToString(CultureInfo.InvariantCulture)}", $"{ECB}{i.ToString(CultureInfo.InvariantCulture)}.MEAS"));
             }
             Append(DirectAccessUpdateBlockAttribute(FBMName, "MA", "1"));
             WriteDriver("END");
         }
+
+        #endregion Public Methods
     }
 
     public class FBM238 : FBM
     {
+        #region Public Methods
+
         public override void Build()
         {
             base.Build();
@@ -1404,14 +1524,14 @@ namespace IOCheckoutTool
         public override void MCIN()
         {
             string blockname = string.Concat(FBMName, "_CIN");
-            WriteDriver(string.Concat("ADD ", Compound, ":", blockname));
+            WriteDriver($"ADD {Compound}:{blockname}");
             WriteDriver("TYPE = MCIN");
-            WriteDriver(string.Concat("DESCRP = FBM", FBMType));
-            WriteDriver(string.Concat("IOM_ID = ", FBMName));
+            WriteDriver($"DESCRP = FBM{FBMType}");
+            WriteDriver($"IOM_ID = {FBMName}");
             WriteDriver("MA = 1");
             WriteDriver("END");
             Append(DirectAccessCreateBlock(Resources.MCIN, blockname));
-            Append(DirectAccessUpdateBlockAttribute(FBMName, "DESCRP", string.Concat("FBM", FBMType)));
+            Append(DirectAccessUpdateBlockAttribute(FBMName, "DESCRP", $"FBM{FBMType}"));
             Append(DirectAccessUpdateBlockAttribute(FBMName, "IOM_ID", FBMName));
             Append(DirectAccessUpdateBlockAttribute(FBMName, "MA", "1"));
         }
@@ -1419,23 +1539,27 @@ namespace IOCheckoutTool
         public override void MCOUT()
         {
             string blockname = string.Concat(FBMName, "_COUT");
-            WriteDriver(string.Concat("ADD ", Compound, ":", blockname));
+            WriteDriver($"ADD {Compound}:{blockname}");
             WriteDriver("TYPE = MCOUT");
-            WriteDriver(string.Concat("DESCRP = FBM", FBMType));
-            WriteDriver(string.Concat("IOM_ID = ", FBMName));
+            WriteDriver($"DESCRP = FBM{FBMType}");
+            WriteDriver($"IOM_ID = {FBMName}");
             WriteDriver("IOMOPT = 1");
             WriteDriver("MA = 1");
             WriteDriver("END");
             Append(DirectAccessCreateBlock(Resources.MCOUT, blockname));
-            Append(DirectAccessUpdateBlockAttribute(FBMName, "DESCRP", string.Concat("FBM", FBMType)));
+            Append(DirectAccessUpdateBlockAttribute(FBMName, "DESCRP", $"FBM{FBMType}"));
             Append(DirectAccessUpdateBlockAttribute(FBMName, "IOM_ID", FBMName));
             Append(DirectAccessUpdateBlockAttribute(FBMName, "IOMOPT", "1"));
             Append(DirectAccessUpdateBlockAttribute(FBMName, "MA", "1"));
         }
+
+        #endregion Public Methods
     }
 
     public class FBM239 : FBM
     {
+        #region Public Methods
+
         public override void Build()
         {
             base.Build();
@@ -1451,38 +1575,42 @@ namespace IOCheckoutTool
         public override void MCIN()
         {
             string blockname = string.Concat(FBMName, "_CIN");
-            WriteDriver(string.Concat("ADD ", Compound, ":", blockname));
+            WriteDriver($"ADD {Compound}:{blockname}");
             WriteDriver("TYPE = MCIN");
-            WriteDriver(string.Concat("DESCRP = FBM", FBMType));
-            WriteDriver(string.Concat("IOM_ID = ", FBMName));
+            WriteDriver($"DESCRP = FBM{FBMType}");
+            WriteDriver($"IOM_ID = {FBMName}");
             WriteDriver("MA = 1");
             WriteDriver("END");
             Append(DirectAccessCreateBlock(Resources.MCIN, blockname));
-            Append(DirectAccessUpdateBlockAttribute(FBMName, "DESCRP", string.Concat("FBM", FBMType)));
-            Append(DirectAccessUpdateBlockAttribute(FBMName, "IOM_ID", FBMName));
-            Append(DirectAccessUpdateBlockAttribute(FBMName, "MA", "1"));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "DESCRP", $"FBM{FBMType}"));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "IOM_ID", FBMName));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "MA", "1"));
         }
 
         public override void MCOUT()
         {
             string blockname = string.Concat(FBMName, "_COUT");
-            WriteDriver(string.Concat("ADD ", Compound, ":", blockname));
+            WriteDriver($"ADD {Compound}:{blockname}");
             WriteDriver("TYPE = MCOUT");
-            WriteDriver(string.Concat("DESCRP = FBM", FBMType));
-            WriteDriver(string.Concat("IOM_ID = ", FBMName));
+            WriteDriver($"DESCRP = FBM{FBMType}");
+            WriteDriver($"IOM_ID = {FBMName}");
             WriteDriver("IOMOPT = 1");
             WriteDriver("MA = 1");
             WriteDriver("END");
             Append(DirectAccessCreateBlock(Resources.MCOUT, blockname));
-            Append(DirectAccessUpdateBlockAttribute(FBMName, "DESCRP", string.Concat("FBM", FBMType)));
-            Append(DirectAccessUpdateBlockAttribute(FBMName, "IOM_ID", FBMName));
-            Append(DirectAccessUpdateBlockAttribute(FBMName, "IOMOPT", "1"));
-            Append(DirectAccessUpdateBlockAttribute(FBMName, "MA", "1"));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "DESCRP", $"FBM{FBMType}"));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "IOM_ID", FBMName));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "IOMOPT", "1"));
+            Append(DirectAccessUpdateBlockAttribute(blockname, "MA", "1"));
         }
+
+        #endregion Public Methods
     }
 
     public class FBM240 : FBM
     {
+        #region Public Methods
+
         public override void Build()
         {
             base.Build();
@@ -1500,26 +1628,34 @@ namespace IOCheckoutTool
 
         public override void MCOUT()
         {
-            WriteDriver(string.Concat("ADD ", Compound, ":", FBMName));
+            WriteDriver($"ADD {Compound}:{FBMName}");
             WriteDriver("TYPE = MCOUT");
-            WriteDriver(string.Concat("DESCRP = FBM", FBMType));
+            WriteDriver($"DESCRP = FBM{FBMType}");
             WriteDriver("IOMOPT = 0");
             WriteDriver("MA = 1");
             WriteDriver("END");
             Append(DirectAccessCreateBlock(Resources.MCOUT, FBMName));
-            Append(DirectAccessUpdateBlockAttribute(FBMName, "DESCRP", string.Concat("FBM", FBMType)));
+            Append(DirectAccessUpdateBlockAttribute(FBMName, "DESCRP", $"FBM{FBMType}"));
             Append(DirectAccessUpdateBlockAttribute(FBMName, "IOM_ID", FBMName));
             Append(DirectAccessUpdateBlockAttribute(FBMName, "IOMOPT", "0"));
             Append(DirectAccessUpdateBlockAttribute(FBMName, "MA", "1"));
         }
+
+        #endregion Public Methods
     }
 
     public class FBM240R : FBM
     {
+        #region Public Constructors
+
         public FBM240R(string redundant)
         {
             base.RedundantName = redundant;
         }
+
+        #endregion Public Constructors
+
+        #region Public Methods
 
         public override void Build()
         {
@@ -1536,42 +1672,46 @@ namespace IOCheckoutTool
             ECBWriter.Dispose();
         }
 
+        public override void ECB5()
+        {
+            WriteDriver($"ADD {CP}_ECB:{FBMName}");
+            WriteDriver("TYPE = ECB5");
+            WriteDriver($"DEV_ID = {FBMName}");
+            WriteDriver($"HWTYPE = {FBMType}");
+            WriteDriver("SWTYPE = 5");
+            WriteDriver($"CHAN = {Channel.Replace("CH ", "", StringComparison.InvariantCultureIgnoreCase)}");
+            WriteDriver("END");
+            WriteDriver(string.Concat("ADD ", CP, "_ECB:", RedundantName));
+            WriteDriver("TYPE = ECB5");
+            WriteDriver(string.Concat("DEV_ID = ", RedundantName));
+            WriteDriver($"HWTYPE = {FBMType}");
+            WriteDriver("SWTYPE = 5");
+            WriteDriver($"CHAN = {Channel.Replace("CH ", "", StringComparison.InvariantCultureIgnoreCase)}");
+            WriteDriver("END");
+        }
+
         public override void MCOUT()
         {
-            WriteDriver(string.Concat("ADD ", Compound, ":", FBMName));
+            WriteDriver($"ADD {Compound}:{FBMName}");
             WriteDriver("TYPE = MCOUT");
-            WriteDriver(string.Concat("DESCRP = FBM", FBMType));
+            WriteDriver($"DESCRP = FBM{FBMType}");
             WriteDriver("IOMOPT = 0");
             WriteDriver("MA = 1");
             WriteDriver("END");
             Append(DirectAccessCreateBlock(Resources.MCOUT, FBMName));
-            Append(DirectAccessUpdateBlockAttribute(FBMName, "DESCRP", string.Concat("FBM", FBMType)));
+            Append(DirectAccessUpdateBlockAttribute(FBMName, "DESCRP", $"FBM{FBMType}"));
             Append(DirectAccessUpdateBlockAttribute(FBMName, "IOM_ID", FBMName));
             Append(DirectAccessUpdateBlockAttribute(FBMName, "IOMOPT", "0"));
             Append(DirectAccessUpdateBlockAttribute(FBMName, "MA", "1"));
         }
 
-        public override void ECB5()
-        {
-            WriteDriver(string.Concat("ADD ", CP, "_ECB:", FBMName));
-            WriteDriver("TYPE = ECB5");
-            WriteDriver(string.Concat("DEV_ID = ", FBMName));
-            WriteDriver(string.Concat("HWTYPE = ", FBMType));
-            WriteDriver("SWTYPE = 5");
-            WriteDriver(string.Concat("CHAN = ", Channel.Replace("CH", "", StringComparison.InvariantCultureIgnoreCase)));
-            WriteDriver("END");
-            WriteDriver(string.Concat("ADD ", CP, "_ECB:", RedundantName));
-            WriteDriver("TYPE = ECB5");
-            WriteDriver(string.Concat("DEV_ID = ", RedundantName));
-            WriteDriver(string.Concat("HWTYPE = ", FBMType));
-            WriteDriver("SWTYPE = 5");
-            WriteDriver(string.Concat("CHAN = ", Channel.Replace("CH", "", StringComparison.InvariantCultureIgnoreCase)));
-            WriteDriver("END");
-        }
+        #endregion Public Methods
     }
 
     public class FBM241 : FBM
     {
+        #region Public Methods
+
         public override void Build()
         {
             base.Build();
@@ -1593,14 +1733,14 @@ namespace IOCheckoutTool
 
         public override void MCOUT()
         {
-            WriteDriver(string.Concat("ADD ", Compound, ":", FBMName));
+            WriteDriver($"ADD {Compound}:{FBMName}");
             WriteDriver("TYPE = MCOUT");
-            WriteDriver(string.Concat("DESCRP = FBM", FBMType));
-            WriteDriver(string.Concat("IOM_ID = ", FBMName));
+            WriteDriver($"DESCRP = FBM{FBMType}");
+            WriteDriver($"IOM_ID = {FBMName}");
             WriteDriver("IOMOPT = 0");
             WriteDriver("MA = 1");
             Append(DirectAccessCreateBlock(Resources.MCOUT, FBMName));
-            Append(DirectAccessUpdateBlockAttribute(FBMName, "DESCRP", string.Concat("FBM", FBMType)));
+            Append(DirectAccessUpdateBlockAttribute(FBMName, "DESCRP", $"FBM{FBMType}"));
             Append(DirectAccessUpdateBlockAttribute(FBMName, "IOM_ID", FBMName));
             Append(DirectAccessUpdateBlockAttribute(FBMName, "IOMOPT", "0"));
             for (int i = 1; i <= 8; ++i)
@@ -1614,10 +1754,14 @@ namespace IOCheckoutTool
             Append(DirectAccessUpdateBlockAttribute(FBMName, "MA", "1"));
             WriteDriver("END");
         }
+
+        #endregion Public Methods
     }
 
     public class FBM242 : FBM
     {
+        #region Public Methods
+
         public override void Build()
         {
             base.Build();
@@ -1628,10 +1772,14 @@ namespace IOCheckoutTool
             ECBWriter.Close();
             ECBWriter.Dispose();
         }
+
+        #endregion Public Methods
     }
 
     public class FBM244 : FBM
     {
+        #region Public Methods
+
         public override void Build()
         {
             base.Build();
@@ -1655,39 +1803,47 @@ namespace IOCheckoutTool
 
         public override void MAIN()
         {
-            WriteDriver(string.Concat("ADD ", Compound, ":", FBMName));
+            WriteDriver($"ADD {Compound}:{FBMName}");
             WriteDriver("TYPE = MAIN");
-            WriteDriver(string.Concat("DESCRP = FBM", FBMType));
+            WriteDriver($"DESCRP = FBM{FBMType}");
             WriteDriver("IOMOPT = 0");
             WriteDriver("MA  = 0");
             Append(DirectAccessCreateBlock(Resources.MAIN, FBMName));
-            Append(DirectAccessUpdateBlockAttribute(FBMName, "DESCRP", string.Concat("FBM", FBMType)));
+            Append(DirectAccessUpdateBlockAttribute(FBMName, "DESCRP", $"FBM{FBMType}"));
             Append(DirectAccessUpdateBlockAttribute(FBMName, "IOMOPT", "0"));
             for (int i = 1; i <= 4; ++i)
             {
-                WriteDriver(string.Concat("SCI_", i.ToString(CultureInfo.InvariantCulture), " = 3"));
-                WriteDriver(string.Concat("MEAS_", i.ToString(CultureInfo.InvariantCulture), " = ", Compound, ":", base.ECB, "_", i.ToString(CultureInfo.InvariantCulture), ".MEAS"));
-                Append(DirectAccessUpdateBlockAttribute(FBMName, string.Concat("SCI_", i.ToString(CultureInfo.InvariantCulture)), "3"));
-                Append(DirectAccessCreateBlockAddressCxn(FBMName, string.Concat("MEAS_", i.ToString(CultureInfo.InvariantCulture)), string.Concat(base.ECB, "_", i.ToString(CultureInfo.InvariantCulture), ".MEAS")));
+                WriteDriver($"SCI_{i.ToString(CultureInfo.InvariantCulture)} = 3");
+                WriteDriver($"MEAS_{i.ToString(CultureInfo.InvariantCulture)} = {Compound}:{ECB}{i.ToString(CultureInfo.InvariantCulture)}.MEAS");
+                Append(DirectAccessUpdateBlockAttribute(FBMName, $"SCI_{i.ToString(CultureInfo.InvariantCulture)}", "3"));
+                Append(DirectAccessCreateBlockAddressCxn(FBMName, $"MEAS_{i.ToString(CultureInfo.InvariantCulture)}", $"{ECB}{i.ToString(CultureInfo.InvariantCulture)}.MEAS"));
             }
             for (int i = 5; i <= 8; ++i)
             {
-                WriteDriver(string.Concat("SCI_", i.ToString(CultureInfo.InvariantCulture), " = 3"));
-                WriteDriver(string.Concat("MEAS_", i.ToString(CultureInfo.InvariantCulture), " = ", Compound, ":", base.ECB, "_", i.ToString(CultureInfo.InvariantCulture), ".OUT"));
-                Append(DirectAccessUpdateBlockAttribute(FBMName, string.Concat("SCI_", i.ToString(CultureInfo.InvariantCulture)), "3"));
-                Append(DirectAccessCreateBlockAddressCxn(FBMName, string.Concat("MEAS_", i.ToString(CultureInfo.InvariantCulture)), string.Concat(base.ECB, "_", i.ToString(CultureInfo.InvariantCulture), ".OUT")));
+                WriteDriver($"SCI_{i.ToString(CultureInfo.InvariantCulture)} = 3");
+                WriteDriver($"MEAS_{i.ToString(CultureInfo.InvariantCulture)} = {Compound}:{ECB}{i.ToString(CultureInfo.InvariantCulture)}.OUT");
+                Append(DirectAccessUpdateBlockAttribute(FBMName, $"SCI_{i.ToString(CultureInfo.InvariantCulture)}", "3"));
+                Append(DirectAccessCreateBlockAddressCxn(FBMName, $"MEAS_{i.ToString(CultureInfo.InvariantCulture)}", $"{ECB}{i.ToString(CultureInfo.InvariantCulture)}.OUT"));
             }
             Append(DirectAccessUpdateBlockAttribute(FBMName, "MA", "0"));
             WriteDriver("END");
         }
+
+        #endregion Public Methods
     }
 
     public class FBM245 : FBM
     {
+        #region Public Constructors
+
         public FBM245(string redundant)
         {
             base.RedundantName = redundant;
         }
+
+        #endregion Public Constructors
+
+        #region Public Methods
 
         public override void Build()
         {
@@ -1710,87 +1866,99 @@ namespace IOCheckoutTool
             ECBWriter.Dispose();
         }
 
-        public override void MAIN()
-        {
-            WriteDriver(string.Concat("ADD ", Compound, ":", FBMName));
-            WriteDriver("TYPE = MAIN");
-            WriteDriver(string.Concat("DESCRP = FBM", FBMType));
-            WriteDriver("IOMOPT = 0");
-            WriteDriver("MA  = 1");
-            Append(DirectAccessCreateBlock(Resources.MAIN, FBMName));
-            Append(DirectAccessUpdateBlockAttribute(FBMName, "DESCRP", string.Concat("FBM", FBMType)));
-            Append(DirectAccessUpdateBlockAttribute(FBMName, "IOMOPT", "0"));
-            for (int i = 1; i <= 4; ++i)
-            {
-                WriteDriver(string.Concat("SCI_", i.ToString(CultureInfo.InvariantCulture), " = 3"));
-                WriteDriver(string.Concat("MEAS_", i.ToString(CultureInfo.InvariantCulture), " = ", Compound, ":", base.ECB, "_", i.ToString(CultureInfo.InvariantCulture), ".MEAS"));
-                Append(DirectAccessUpdateBlockAttribute(FBMName, string.Concat("SCI_", i.ToString(CultureInfo.InvariantCulture)), "3"));
-                Append(DirectAccessCreateBlockAddressCxn(FBMName, string.Concat("MEAS_", i.ToString(CultureInfo.InvariantCulture)), string.Concat(base.ECB, "_", i.ToString(CultureInfo.InvariantCulture), ".MEAS")));
-            }
-            for (int i = 5; i <= 8; ++i)
-            {
-                WriteDriver(string.Concat("SCI_", i.ToString(CultureInfo.InvariantCulture), " = 3"));
-                WriteDriver(string.Concat("MEAS_", i.ToString(CultureInfo.InvariantCulture), " = ", Compound, ":", base.ECB, "_", i.ToString(CultureInfo.InvariantCulture), ".OUT"));
-                Append(DirectAccessUpdateBlockAttribute(FBMName, string.Concat("SCI_", i.ToString(CultureInfo.InvariantCulture)), "3"));
-                Append(DirectAccessCreateBlockAddressCxn(FBMName, string.Concat("MEAS_", i.ToString(CultureInfo.InvariantCulture)), string.Concat(base.ECB, "_", i.ToString(CultureInfo.InvariantCulture), ".OUT")));
-            }
-            Append(DirectAccessUpdateBlockAttribute(FBMName, "MA", "1"));
-            WriteDriver("END");
-        }
-
         public override void ECB201(int i, string blockktype = "")
         {
-            string blockname = string.Concat(ECB, "_", i.ToString(CultureInfo.InvariantCulture));
+            string blockname = $"{ECB}{i.ToString(CultureInfo.InvariantCulture)}";
             string compound = string.Concat(CP, "_ECB");
             string devid = string.Concat(blockname[..5], i.ToString(CultureInfo.InvariantCulture));
-            WriteDriver(string.Concat("ADD ", compound, ":", blockname));
+            WriteDriver($"ADD {Compound}:{blockname}");
             WriteDriver("TYPE = ECB201");
             WriteDriver(string.Concat("DEV_ID = ", devid));
-            WriteDriver(string.Concat("HWTYPE = ", FBMType));
-            WriteDriver(string.Concat("SWTYPE = ", FBMType));
+            WriteDriver($"HWTYPE = {FBMType}");
+            WriteDriver($"SWTYPE = {FBMType}");
             WriteDriver(string.Concat("PARENT = ", CP, "_ECB:", FBMName));
             WriteDriver(string.Concat("DVNAME = CH", i.ToString(CultureInfo.InvariantCulture)));
             WriteDriver("DVOPTS = 4-20");
             WriteDriver("END");
-            WriteECB(string.Concat("echo Enabling ", ECB, i.ToString(CultureInfo.InvariantCulture)));
+            WriteECB($"echo Enabling {ECB}{i.ToString(CultureInfo.InvariantCulture)}");
             WriteECB(string.Concat(OMSET, " -l 1 ", compound, ":", blockname, ".ACTION"));
             Append(DirectAccessCreateECB(blockname));
             Append(DirectAccessUpdateECBAttribute(blockname, "DEV_ID", devid));
             Append(DirectAccessUpdateECBAttribute(blockname, "HWTYPE", FBMType));
             Append(DirectAccessUpdateECBAttribute(blockname, "SWTYPE", FBMType));
-            Append(DirectAccessUpdateECBAttribute(blockname, "DVNAME", string.Concat("CH", i.ToString(CultureInfo.InvariantCulture))));
+            Append(DirectAccessUpdateECBAttribute(blockname, "DVNAME", string.Concat("CH ", i.ToString(CultureInfo.InvariantCulture))));
             Append(DirectAccessUpdateECBAttribute(blockname, "DVOPTS", "4-20"));
-            string redundantname = string.Concat(ECB, "_", i.ToString(CultureInfo.InvariantCulture));
+            string redundantname = $"{ECB}{i.ToString(CultureInfo.InvariantCulture)}";
             string redundantdevid = string.Concat(blockname[..5], i.ToString(CultureInfo.InvariantCulture));
             WriteDriver(string.Concat("ADD ", compound, ":", redundantname));
             WriteDriver("TYPE = ECB201");
             WriteDriver(string.Concat("DEV_ID = ", redundantdevid));
-            WriteDriver(string.Concat("HWTYPE = ", FBMType));
-            WriteDriver(string.Concat("SWTYPE = ", FBMType));
+            WriteDriver($"HWTYPE = {FBMType}");
+            WriteDriver($"SWTYPE = {FBMType}");
             WriteDriver(string.Concat("PARENT = ", CP, "_ECB:", FBMName));
             WriteDriver(string.Concat("DVNAME = CH", i.ToString(CultureInfo.InvariantCulture)));
             WriteDriver("DVOPTS = 4-20");
             WriteDriver("END");
-            WriteECB(string.Concat("echo Enabling ", ECB, i.ToString(CultureInfo.InvariantCulture)));
+            WriteECB($"echo Enabling {ECB}{i.ToString(CultureInfo.InvariantCulture)}");
             WriteECB(string.Concat(OMSET, " -l 1 ", compound, ":", redundantname, ".ACTION"));
             Append(DirectAccessCreateECB(redundantname));
             Append(DirectAccessUpdateECBAttribute(redundantname, "DEV_ID", redundantdevid));
             Append(DirectAccessUpdateECBAttribute(redundantname, "HWTYPE", FBMType));
             Append(DirectAccessUpdateECBAttribute(redundantname, "SWTYPE", FBMType));
-            Append(DirectAccessUpdateECBAttribute(redundantname, "DVNAME", string.Concat("CH", i.ToString(CultureInfo.InvariantCulture))));
+            Append(DirectAccessUpdateECBAttribute(redundantname, "DVNAME", string.Concat("CH ", i.ToString(CultureInfo.InvariantCulture))));
             Append(DirectAccessUpdateECBAttribute(redundantname, "DVOPTS", "4-20"));
         }
+
+        public override void MAIN()
+        {
+            WriteDriver($"ADD {Compound}:{FBMName}");
+            WriteDriver("TYPE = MAIN");
+            WriteDriver($"DESCRP = FBM{FBMType}");
+            WriteDriver("IOMOPT = 0");
+            WriteDriver("MA  = 1");
+            Append(DirectAccessCreateBlock(Resources.MAIN, FBMName));
+            Append(DirectAccessUpdateBlockAttribute(FBMName, "DESCRP", $"FBM{FBMType}"));
+            Append(DirectAccessUpdateBlockAttribute(FBMName, "IOMOPT", "0"));
+            for (int i = 1; i <= 4; ++i)
+            {
+                WriteDriver($"SCI_{i.ToString(CultureInfo.InvariantCulture)} = 3");
+                WriteDriver($"MEAS_{i.ToString(CultureInfo.InvariantCulture)} = {Compound}:{ECB}{i.ToString(CultureInfo.InvariantCulture)}.MEAS");
+                Append(DirectAccessUpdateBlockAttribute(FBMName, $"SCI_{i.ToString(CultureInfo.InvariantCulture)}", "3"));
+            Append(DirectAccessCreateBlockAddressCxn(FBMName, $"MEAS_{i.ToString(CultureInfo.InvariantCulture)}", $"{ECB}{i.ToString(CultureInfo.InvariantCulture)}.MEAS"));
+            }
+            for (int i = 5; i <= 8; ++i)
+            {
+                WriteDriver($"SCI_{i.ToString(CultureInfo.InvariantCulture)} = 3");
+                WriteDriver($"MEAS_{i.ToString(CultureInfo.InvariantCulture)} = {Compound}:{ECB}{i.ToString(CultureInfo.InvariantCulture)}.OUT");
+                Append(DirectAccessUpdateBlockAttribute(FBMName, $"SCI_{i.ToString(CultureInfo.InvariantCulture)}", "3"));
+                Append(DirectAccessCreateBlockAddressCxn(FBMName, $"MEAS_{i.ToString(CultureInfo.InvariantCulture)}", $"{ECB}{i.ToString(CultureInfo.InvariantCulture)}.OUT"));
+            }
+            Append(DirectAccessUpdateBlockAttribute(FBMName, "MA", "1"));
+            WriteDriver("END");
+        }
+
+        #endregion Public Methods
     }
 
     public class FBM247 : FBM
     {
+        #region Fields
+
+        private readonly List<string> _blocks;
+
+        #endregion Fields
+
+        #region Public Constructors
+
         public FBM247(List<string> blocks)
         {
-            Blocks = new List<string>();
-            Blocks = blocks;
+            _blocks = new List<string>();
+            _blocks = blocks;
         }
 
-        private readonly List<string> Blocks;
+        #endregion Public Constructors
+
+        #region Public Methods
 
         public override void Build()
         {
@@ -1799,7 +1967,7 @@ namespace IOCheckoutTool
             int i = 1;
             bool analog = false;
             bool digital = false;
-            foreach (string block in Blocks)
+            foreach (string block in _blocks)
             {
                 switch (block)
                 {
@@ -1848,14 +2016,14 @@ namespace IOCheckoutTool
 
         public override void ECB201(int i, string blockktype)
         {
-            string blockname = string.Concat(ECB, "_", i.ToString(CultureInfo.InvariantCulture));
+            string blockname = $"{ECB}{i.ToString(CultureInfo.InvariantCulture)}";
             string compound = string.Concat(CP, "_ECB");
-            string devid = string.Concat(ECB[1..^0], i.ToString(CultureInfo.InvariantCulture));
-            WriteDriver(string.Concat("ADD ", compound, ":", blockname));
+            string devid = string.Concat(ECB[1..6], i.ToString(CultureInfo.InvariantCulture));
+            WriteDriver($"ADD {compound}:{blockname}");
             WriteDriver("TYPE = ECB201");
             WriteDriver(string.Concat("DEV_ID = ", devid));
-            WriteDriver(string.Concat("HWTYPE = ", FBMType));
-            WriteDriver(string.Concat("SWTYPE = ", FBMType));
+            WriteDriver($"HWTYPE = {FBMType}");
+            WriteDriver($"SWTYPE = {FBMType}");
             WriteDriver(string.Concat("PARENT = ", CP, "_ECB:", FBMName));
             Append(DirectAccessCreateECB(blockname));
             Append(DirectAccessUpdateECBAttribute(blockname, "DEV_ID", devid));
@@ -1865,51 +2033,50 @@ namespace IOCheckoutTool
             switch (blockktype)
             {
                 case "IN":
-                    WriteDriver(string.Concat("DVNAME = CH", i.ToString(CultureInfo.InvariantCulture), " I LPWR"));
-                    Append(DirectAccessUpdateECBAttribute(blockname, "DVNAME", string.Concat("CH", i.ToString(CultureInfo.InvariantCulture), " I LPWR")));
+                    WriteDriver($"DVNAME = CH{i.ToString(CultureInfo.InvariantCulture)} I LPWR");
+                    Append(DirectAccessUpdateECBAttribute(blockname, "DVNAME", $"CH{i.ToString(CultureInfo.InvariantCulture)} I LPWR"));
                     break;
 
                 case "OUT":
-                    WriteDriver(string.Concat("DVNAME = CH", i.ToString(CultureInfo.InvariantCulture), " O LPWR"));
-                    Append(DirectAccessUpdateECBAttribute(blockname, "DVNAME", string.Concat("CH", i.ToString(CultureInfo.InvariantCulture), " O LPWR")));
+                    WriteDriver($"DVNAME = CH{i.ToString(CultureInfo.InvariantCulture)} O LPWR");
+                    Append(DirectAccessUpdateECBAttribute(blockname, "DVNAME", $"CH{i.ToString(CultureInfo.InvariantCulture)} O LPWR"));
                     break;
             }
             WriteDriver("DVOPTS = 4-20");
             WriteDriver("END");
             Append(DirectAccessUpdateECBAttribute(blockname, "DVOPTS", "4-20"));
-            WriteECB(string.Concat("echo Enabling ", ECB, i.ToString(CultureInfo.InvariantCulture)));
-            WriteECB(string.Concat(base.OMSET, " -l 1 ", CP, "_ECB:", ECB, i.ToString(CultureInfo.InvariantCulture), ".ACTION"));
+            WriteECB($"echo Enabling {ECB}{i.ToString(CultureInfo.InvariantCulture)}");
+            WriteECB($"{OMSET} -l 1 {CP}_ECB:{ECB}{i.ToString(CultureInfo.InvariantCulture)}.ACTION");
         }
 
         public override void MAIN()
         {
-            WriteDriver(string.Concat("ADD ", Compound, ":", FBMName));
+            WriteDriver($"ADD {Compound}:{FBMName}");
             WriteDriver("TYPE = MAIN");
-            WriteDriver(string.Concat("DESCRP = FBM", FBMType));
+            WriteDriver($"DESCRP = FBM{FBMType}");
             WriteDriver("IOMOPT = 0");
             WriteDriver("MA = 0");
             Append(DirectAccessCreateBlock(Resources.MAIN, FBMName));
-            Append(DirectAccessUpdateBlockAttribute(FBMName, "DESCRP", string.Concat("FBM", FBMType)));
+            Append(DirectAccessUpdateBlockAttribute(FBMName, "DESCRP", $"FBM{FBMType}"));
             Append(DirectAccessUpdateBlockAttribute(FBMName, "IOMOPT", "0"));
             int i = 1;
-            foreach (string block in Blocks.Where(x => x == "RIN" || x == "ROUT"))
+            foreach (string block in _blocks.Where(x => x == "RIN" || x == "ROUT"))
             {
                 switch (block)
                 {
                     case "RIN":
-                        WriteDriver(string.Concat("SCI_", i.ToString(CultureInfo.InvariantCulture), " = 3"));
-                        WriteDriver(string.Concat("MEAS_", i.ToString(CultureInfo.InvariantCulture), " = ", Compound, ":", base.ECB, "_", i.ToString(CultureInfo.InvariantCulture), ".MEAS"));
-                        Append(DirectAccessUpdateBlockAttribute(FBMName, string.Concat("SCI_", i.ToString(CultureInfo.InvariantCulture)), "3"));
-                        Append(DirectAccessCreateBlockAddressCxn(FBMName, string.Concat("MEAS_", i.ToString(CultureInfo.InvariantCulture)), string.Concat(base.ECB, "_", i.ToString(CultureInfo.InvariantCulture), ".MEAS")));
+                        WriteDriver($"SCI_{i.ToString(CultureInfo.InvariantCulture)} = 3");
+                        WriteDriver($"MEAS_{i.ToString(CultureInfo.InvariantCulture)} = {Compound}:{ECB}{i.ToString(CultureInfo.InvariantCulture)}.MEAS");
+                        Append(DirectAccessUpdateBlockAttribute(FBMName, $"SCI_{i.ToString(CultureInfo.InvariantCulture)}","3"));
+                        Append(DirectAccessCreateBlockAddressCxn(FBMName, $"MEAS_{i.ToString(CultureInfo.InvariantCulture)}", $"{ECB}{i.ToString(CultureInfo.InvariantCulture)}.MEAS"));
                         break;
 
                     case "ROUT":
-                        WriteDriver(string.Concat("SCI_", i.ToString(CultureInfo.InvariantCulture), " = 3"));
+                        WriteDriver($"SCI_{i.ToString(CultureInfo.InvariantCulture)} = 3");
                         WriteDriver(string.Concat("SCO_", i.ToString(CultureInfo.InvariantCulture), " = 3"));
-                        WriteDriver(string.Concat("MEAS_", i.ToString(CultureInfo.InvariantCulture), " = ", Compound, ":", base.ECB, "_", i.ToString(CultureInfo.InvariantCulture), ".OUT"));
-                        Append(DirectAccessUpdateBlockAttribute(FBMName, string.Concat("SCI_", i.ToString(CultureInfo.InvariantCulture)), "3"));
-                        Append(DirectAccessUpdateBlockAttribute(FBMName, string.Concat("SCI_", i.ToString(CultureInfo.InvariantCulture)), "3"));
-                        Append(DirectAccessCreateBlockAddressCxn(FBMName, string.Concat("MEAS_", i.ToString(CultureInfo.InvariantCulture)), string.Concat(base.ECB, "_", i.ToString(CultureInfo.InvariantCulture), ".OUT")));
+                        WriteDriver($"MEAS_{i.ToString(CultureInfo.InvariantCulture)} = {Compound}:{ECB}{i.ToString(CultureInfo.InvariantCulture)}.OUT");
+                        Append(DirectAccessUpdateBlockAttribute(FBMName, $"SCI_{i.ToString(CultureInfo.InvariantCulture)}", "3"));
+                        Append(DirectAccessCreateBlockAddressCxn(FBMName, $"MEAS_{i.ToString(CultureInfo.InvariantCulture)}", $"{ECB}{i.ToString(CultureInfo.InvariantCulture)}.OUT"));
                         break;
                 }
                 ++i;
@@ -1920,18 +2087,18 @@ namespace IOCheckoutTool
 
         public override void MCOUT()
         {
-            WriteDriver(string.Concat("ADD ", Compound, ":", FBMName));
+            WriteDriver($"ADD {Compound}:{FBMName}");
             WriteDriver("TYPE = MCOUT");
-            WriteDriver(string.Concat("DESCRP = FBM", FBMType));
-            WriteDriver(string.Concat("IOM_ID = ", FBMName));
+            WriteDriver($"DESCRP = FBM{FBMType}");
+            WriteDriver($"IOM_ID = {FBMName}");
             WriteDriver("IOMOPT = 0");
             WriteDriver("MA = 0");
             Append(DirectAccessCreateBlock(Resources.MCOUT, FBMName));
-            Append(DirectAccessUpdateBlockAttribute(FBMName, "DESCRP", string.Concat("FBM", FBMType)));
+            Append(DirectAccessUpdateBlockAttribute(FBMName, "DESCRP", $"FBM{FBMType}"));
             Append(DirectAccessUpdateBlockAttribute(FBMName, "IOM_ID", FBMName));
             Append(DirectAccessUpdateBlockAttribute(FBMName, "IOMOPT", "0"));
             int i = 1;
-            foreach (string block in Blocks.Where(x => x == "BIN" || x == "BOUT"))
+            foreach (string block in _blocks.Where(x => x == "BIN" || x == "BOUT"))
             {
                 switch (block)
                 {
@@ -1950,17 +2117,29 @@ namespace IOCheckoutTool
             Append(DirectAccessUpdateBlockAttribute(FBMName, "MA", "0"));
             WriteDriver("END");
         }
+
+        #endregion Public Methods
     }
 
     public class FBM248 : FBM
     {
+        #region Fields
+
+        private readonly List<string> _blocks;
+
+        #endregion Fields
+
+        #region Public Constructors
+
         public FBM248(List<string> blocks)
         {
-            Blocks = new List<string>();
-            Blocks = blocks;
+            _blocks = new List<string>();
+            _blocks = blocks;
         }
 
-        private readonly List<string> Blocks;
+        #endregion Public Constructors
+
+        #region Public Methods
 
         public override void Build()
         {
@@ -1969,7 +2148,7 @@ namespace IOCheckoutTool
             int i = 1;
             bool analog = false;
             bool digital = false;
-            foreach (string block in Blocks)
+            foreach (string block in _blocks)
             {
                 switch (block)
                 {
@@ -2018,14 +2197,14 @@ namespace IOCheckoutTool
 
         public override void ECB201(int i, string blockktype)
         {
-            string blockname = string.Concat(ECB, "_", i.ToString(CultureInfo.InvariantCulture));
+            string blockname = $"{ECB}{i.ToString(CultureInfo.InvariantCulture)}";
             string compound = string.Concat(CP, "_ECB");
-            string devid = string.Concat(ECB[1..^0], i.ToString(CultureInfo.InvariantCulture));
-            WriteDriver(string.Concat("ADD ", compound, ":", blockname));
+            string devid = string.Concat(ECB[1..6], i.ToString(CultureInfo.InvariantCulture));
+            WriteDriver($"ADD {compound}:{blockname}");
             WriteDriver("TYPE = ECB201");
             WriteDriver(string.Concat("DEV_ID = ", devid));
-            WriteDriver(string.Concat("HWTYPE = ", FBMType));
-            WriteDriver(string.Concat("SWTYPE = ", FBMType));
+            WriteDriver($"HWTYPE = {FBMType}");
+            WriteDriver($"SWTYPE = {FBMType}");
             WriteDriver(string.Concat("PARENT = ", CP, "_ECB:", FBMName));
             Append(DirectAccessCreateECB(blockname));
             Append(DirectAccessUpdateECBAttribute(blockname, "DEV_ID", devid));
@@ -2035,51 +2214,51 @@ namespace IOCheckoutTool
             switch (blockktype)
             {
                 case "IN":
-                    WriteDriver(string.Concat("DVNAME = CH", i.ToString(CultureInfo.InvariantCulture), " I LPWR"));
-                    Append(DirectAccessUpdateECBAttribute(blockname, "DVNAME", string.Concat("CH", i.ToString(CultureInfo.InvariantCulture), " I LPWR")));
+                    WriteDriver($"DVNAME = CH{i.ToString(CultureInfo.InvariantCulture)} I LPWR");
+                    Append(DirectAccessUpdateECBAttribute(blockname, "DVNAME", $"CH{i.ToString(CultureInfo.InvariantCulture)} I LPWR"));
                     break;
 
                 case "OUT":
-                    WriteDriver(string.Concat("DVNAME = CH", i.ToString(CultureInfo.InvariantCulture), " O LPWR"));
-                    Append(DirectAccessUpdateECBAttribute(blockname, "DVNAME", string.Concat("CH", i.ToString(CultureInfo.InvariantCulture), " O LPWR")));
+                    WriteDriver($"DVNAME = CH{i.ToString(CultureInfo.InvariantCulture)} O LPWR");
+                    Append(DirectAccessUpdateECBAttribute(blockname, "DVNAME", $"CH{i.ToString(CultureInfo.InvariantCulture)} O LPWR"));
                     break;
             }
             WriteDriver("DVOPTS = 4-20");
             WriteDriver("END");
             Append(DirectAccessUpdateECBAttribute(blockname, "DVOPTS", "4-20"));
-            WriteECB(string.Concat("echo Enabling ", ECB, i.ToString(CultureInfo.InvariantCulture)));
-            WriteECB(string.Concat(base.OMSET, " -l 1 ", CP, "_ECB:", ECB, i.ToString(CultureInfo.InvariantCulture), ".ACTION"));
+            WriteECB($"echo Enabling {ECB}{i.ToString(CultureInfo.InvariantCulture)}");
+            WriteECB($"{OMSET} -l 1 {CP}_ECB:{ECB}{i.ToString(CultureInfo.InvariantCulture)}.ACTION");
         }
 
         public override void MAIN()
         {
-            WriteDriver(string.Concat("ADD ", Compound, ":", FBMName));
+            WriteDriver($"ADD {Compound}:{FBMName}");
             WriteDriver("TYPE = MAIN");
-            WriteDriver(string.Concat("DESCRP = FBM", FBMType));
+            WriteDriver($"DESCRP = FBM{FBMType}");
             WriteDriver("IOMOPT = 0");
             WriteDriver("MA = 0");
             Append(DirectAccessCreateBlock(Resources.MAIN, FBMName));
-            Append(DirectAccessUpdateBlockAttribute(FBMName, "DESCRP", string.Concat("FBM", FBMType)));
+            Append(DirectAccessUpdateBlockAttribute(FBMName, "DESCRP", $"FBM{FBMType}"));
             Append(DirectAccessUpdateBlockAttribute(FBMName, "IOMOPT", "0"));
             int i = 1;
-            foreach (string block in Blocks.Where(x => x == "RIN" || x == "ROUT"))
+            foreach (string block in _blocks.Where(x => x == "RIN" || x == "ROUT"))
             {
                 switch (block)
                 {
                     case "RIN":
-                        WriteDriver(string.Concat("SCI_", i.ToString(CultureInfo.InvariantCulture), " = 3"));
-                        WriteDriver(string.Concat("MEAS_", i.ToString(CultureInfo.InvariantCulture), " = ", Compound, ":", base.ECB, "_", i.ToString(CultureInfo.InvariantCulture), ".MEAS"));
-                        Append(DirectAccessUpdateBlockAttribute(FBMName, string.Concat("SCI_", i.ToString(CultureInfo.InvariantCulture)), "3"));
-                        Append(DirectAccessCreateBlockAddressCxn(FBMName, string.Concat("MEAS_", i.ToString(CultureInfo.InvariantCulture)), string.Concat(base.ECB, "_", i.ToString(CultureInfo.InvariantCulture), ".MEAS")));
+                        WriteDriver($"SCI_{i.ToString(CultureInfo.InvariantCulture)} = 3");
+                        WriteDriver($"MEAS_{i.ToString(CultureInfo.InvariantCulture)} = {Compound}:{ECB}{i.ToString(CultureInfo.InvariantCulture)}.MEAS");
+                        Append(DirectAccessUpdateBlockAttribute(FBMName, $"SCI_{i.ToString(CultureInfo.InvariantCulture)}", "3"));
+                        Append(DirectAccessCreateBlockAddressCxn(FBMName, $"MEAS_{i.ToString(CultureInfo.InvariantCulture)}", $"{ECB}{i.ToString(CultureInfo.InvariantCulture)}.MEAS"));
                         break;
 
                     case "ROUT":
-                        WriteDriver(string.Concat("SCI_", i.ToString(CultureInfo.InvariantCulture), " = 3"));
+                        WriteDriver($"SCI_{i.ToString(CultureInfo.InvariantCulture)} = 3");
                         WriteDriver(string.Concat("SCO_", i.ToString(CultureInfo.InvariantCulture), " = 3"));
-                        WriteDriver(string.Concat("MEAS_", i.ToString(CultureInfo.InvariantCulture), " = ", Compound, ":", base.ECB, "_", i.ToString(CultureInfo.InvariantCulture), ".OUT"));
-                        Append(DirectAccessUpdateBlockAttribute(FBMName, string.Concat("SCI_", i.ToString(CultureInfo.InvariantCulture)), "3"));
-                        Append(DirectAccessUpdateBlockAttribute(FBMName, string.Concat("SCI_", i.ToString(CultureInfo.InvariantCulture)), "3"));
-                        Append(DirectAccessCreateBlockAddressCxn(FBMName, string.Concat("MEAS_", i.ToString(CultureInfo.InvariantCulture)), string.Concat(base.ECB, "_", i.ToString(CultureInfo.InvariantCulture), ".OUT")));
+                        WriteDriver($"MEAS_{i.ToString(CultureInfo.InvariantCulture)} = {Compound}:{ECB}{i.ToString(CultureInfo.InvariantCulture)}.OUT");
+                        Append(DirectAccessUpdateBlockAttribute(FBMName, $"SCI_{i.ToString(CultureInfo.InvariantCulture)}", "3"));
+                        Append(DirectAccessUpdateBlockAttribute(FBMName, $"SCI_{i.ToString(CultureInfo.InvariantCulture)}", "3"));
+                        Append(DirectAccessCreateBlockAddressCxn(FBMName, $"MEAS_{i.ToString(CultureInfo.InvariantCulture)}", $"{ECB}{i.ToString(CultureInfo.InvariantCulture)}.OUT"));
                         break;
                 }
                 ++i;
@@ -2090,18 +2269,18 @@ namespace IOCheckoutTool
 
         public override void MCOUT()
         {
-            WriteDriver(string.Concat("ADD ", Compound, ":", FBMName));
+            WriteDriver($"ADD {Compound}:{FBMName}");
             WriteDriver("TYPE = MCOUT");
-            WriteDriver(string.Concat("DESCRP = FBM", FBMType));
-            WriteDriver(string.Concat("IOM_ID = ", FBMName));
+            WriteDriver($"DESCRP = FBM{FBMType}");
+            WriteDriver($"IOM_ID = {FBMName}");
             WriteDriver("IOMOPT = 0");
             WriteDriver("MA = 0");
             Append(DirectAccessCreateBlock(Resources.MCOUT, FBMName));
-            Append(DirectAccessUpdateBlockAttribute(FBMName, "DESCRP", string.Concat("FBM", FBMType)));
+            Append(DirectAccessUpdateBlockAttribute(FBMName, "DESCRP", $"FBM{FBMType}"));
             Append(DirectAccessUpdateBlockAttribute(FBMName, "IOM_ID", FBMName));
             Append(DirectAccessUpdateBlockAttribute(FBMName, "IOMOPT", "0"));
             int i = 1;
-            foreach (string block in Blocks.Where(x => x == "BIN" || x == "BOUT"))
+            foreach (string block in _blocks.Where(x => x == "BIN" || x == "BOUT"))
             {
                 switch (block)
                 {
@@ -2120,5 +2299,7 @@ namespace IOCheckoutTool
             Append(DirectAccessUpdateBlockAttribute(FBMName, "MA", "0"));
             WriteDriver("END");
         }
+
+        #endregion Public Methods
     }
 }

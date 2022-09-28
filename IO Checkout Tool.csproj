@@ -60,6 +60,31 @@
     <Page Remove="Projects\**" />
   </ItemGroup>
   <ItemGroup>
+    <None Remove="Archestra_Test_Database_Creator.xlsm" />
+    <None Remove="CP0197.i" />
+    <None Remove="CP0198.i" />
+    <None Remove="CP0199.i" />
+    <None Remove="CP0200.i" />
+    <None Remove="CP0201.i" />
+    <None Remove="CP_FBM Image.png" />
+    <None Remove="Database Image.png" />
+    <None Remove="Default Image.png" />
+    <None Remove="ECB Image.png" />
+    <None Remove="icc_inpt_gen.awk" />
+    <None Remove="icc_inpt_VLO.awk" />
+    <None Remove="icc_iocheckout.awk" />
+    <None Remove="icc_iocheckout_valero.awk" />
+    <None Remove="Input Image.png" />
+    <None Remove="IO Checkout Tool_TemporaryKey.pfx" />
+    <None Remove="IO_Checkout.zip" />
+    <None Remove="Multiple Input Image.png" />
+    <None Remove="Multiple Output Image.png" />
+    <None Remove="Nest_Load.txt" />
+    <None Remove="Nest_Load_bkup.txt" />
+    <None Remove="Nest_Load_Valero.txt" />
+    <None Remove="Output Image.png" />
+  </ItemGroup>
+  <ItemGroup>
     <EmbeddedResource Include="Instructions for Using IO Checkout Tool.pdf">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </EmbeddedResource>

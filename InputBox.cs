@@ -5,6 +5,12 @@ namespace IOCheckoutTool
 {
     public partial class InputBox : Form
     {
+        #region Properties
+        public string Output { get; set; }
+        #endregion Properties
+
+        #region Public Constructors
+
         public InputBox(string label)
         {
             InitializeComponent();
@@ -12,12 +18,16 @@ namespace IOCheckoutTool
             Input.Focus();
         }
 
-        public string Output { get; set; }
+        #endregion Public Constructors
+
+        #region Private Methods
 
         private void OKButton_Click(object sender, EventArgs e)
         {
             Output = Input.Text;
             Close();
         }
+
+        #endregion Private Methods
     }
 }

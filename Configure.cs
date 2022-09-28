@@ -1,14 +1,19 @@
-﻿using IOCheckoutTool.Properties;
-using System;
+﻿using System;
 using System.Windows.Forms;
+
+using IOCheckoutTool.Properties;
 
 namespace IOCheckoutTool
 {
     public partial class Configure : Form
     {
-        public string FBMName { get; set; }
+        #region Properties
         public string Channel { get; set; }
+        public string FBMName { get; set; }
         public string RedundantName { get; set; }
+        #endregion Properties
+
+        #region Public Constructors
 
         public Configure(bool redundant = false)
         {
@@ -16,6 +21,10 @@ namespace IOCheckoutTool
             RedundantLabel.Visible = redundant;
             RedundantNameBox.Visible = redundant;
         }
+
+        #endregion Public Constructors
+
+        #region Private Methods
 
         private void ConfigButton_Click(object sender, EventArgs e)
         {
@@ -32,5 +41,7 @@ namespace IOCheckoutTool
             Channel = ChannelBox.SelectedItem.ToString();
             RedundantName = RedundantNameBox.Text;
         }
+
+        #endregion Private Methods
     }
 }

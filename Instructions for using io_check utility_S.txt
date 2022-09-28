@@ -1,0 +1,100 @@
+Instructions for using the IO_Checkout utility:
+(These steps are for an XP IA station.)
+
+1.  Place this utility folder on D drive.
+
+2.  Create Nest_Load.txt file with 3 or 5 column headings:
+	(Nest_Load.txt has 3 columns while Nest_Load_2 has 5)
+
+	FTA = this is the letterbug of each FBM (parent & child) & FCM
+	Mod type = this is the type of FBM, i.e., FCM100, FBM216, etc.
+	CP = this is the control processor CP
+	CHAN= this is the channel/segment that the FBMs are connected to. (1,2,3,4)
+	IO= this ONLY applies to FBM 247 (HART CAPABLE). "A" will create 8 RIN blocks for 8 inputs."B" will create 4 RINs/4 ROUTs. 
+
+Sort this file by FTA column (per baseplate):  FCM must be listed first before all
+the FBM's on that baseplate.
+
+Save this file as a csv file format with filename Nest_Load.txt in the same
+directory as the icc_inpt_gen_V2.awk file.  If elected to use a different filename,
+open file icc_inpt_gen.bat, and replace the Nest_Load.txt with the new filename.
+
+Add additional statements for other FBM's not shown (if necessary).
+
+3.  Run the .awk script from the Unix shell (D:, ncenv, then sh to get to
+the $ prompt).  Change to the directory where the .awk script is located first.
+
+Syntax:  awk -f icc_iocheckout.awk Nest_Load.txt.
+
+4.  Input files (.i extension) will be created for each CP.
+	*Check all FBM 202, 247, RIN, and MAIN in .i file to confirm that all are built
+
+5.  Will ask to run iccdrvr.tsk or can use iccdrvr.tsk to add the input files to the CP's in the shell environment.
+    iccdrvr.tsk -i inputfile -o outputfile
+
+    Example:  iccdrvr.tsk -i cp0101 -o cp0101.o
+
+6.  From System Management, put the FCM's and parent ECB's on-line.
+7a.  For Windows Station:  File ChildECBEnable.bat will be automatically generated.  Edit file
+ChildECBEnable.bat (if necessary) for the appropriate CP names, and ECB names.
+Then run this file by double clicking it to put all child ECB's on-line.
+
+7b.  For Solaris Station:  Edit ChildECBEnable.bat as follows:
+
+	a. Add to the top of the file line:  #!/bin/sh
+	b. Replace "echo" with "#".
+	c. Replace "\" with "/".
+	d. Remove "D:".
+	e. Save this new file with no extension.
+	f. Copy this file to any directory on the Solaris host AW.
+	g. Run unix2dos to remove all carriage returns in the file.
+	h. Use chmod to give this file execution permission.
+	i. Run this file from VT100 window.
+
+*****************************************************************************************
+Alternate steps to create a SaveAll from a Solaris station to import into IACC for downloading:
+
+NOTE:  If generating the ECB's using iccdrvr.tsk into a work volume such as
+volwrk, vol001, vol002, etc. on a UNIX station.  First, copy these input .i files into
+/opt/fox/ciocfg/api, remove the .i extension, then edit each of these input files (*.i)
+as shown:
+
+1.  Replace string OPEN CPNAME with OPEN volume# (case sensitive)
+
+    Example:  OPEN volwrk, or OPEN vol005 (lower case volumne name)
+
+2.  Replacing all strings ADD CPNAME_ECB with ADD VOLUME#_VECB
+
+    Example:  ADD VOLWRK_VECB, or ADD VOL004_VECB (all upper case, and VECB)
+
+3.  Use iccdrvr.tsk command to add the ECB's to the CP's (in VT100):
+
+    iccdrvr.tsk -i inputfile -o outputfile
+
+    Example:  iccdrvr.tsk -i cp0101 -o cp0101.o
+
+    File cp0101.o contains the iccdrvr.tsk activities including WARNING and
+    ERR that can be searched for.  Make the corrections in the input file as
+    necessary then retry iccdrvr.tsk again.
+
+NOTE:  if using the same volume for another iccdrvr.tsk activity for another
+input file, then first initialize this volume then open this volume and exit
+so that proper volume name will be created for future use.
+
+4.  After the ECB's are created in the volume for a CP, run SAVEALL command
+from a VT100 window so that the SaveAll will be saved to a file in the directory
+specified in the path specified with the SaveAll syntax.  This method allows
+the SaveAll to be imported into IACC.
+
+	cd /opt/fox/ciocfg/api
+	save_all -d station directory_path
+
+	Example:  save_all -d volwrk /opt/fox/ciocfg/api/deleteme
+
+5.  Go to the directory specified in the SaveAll command above, and tar
+them to a disk.
+
+6.  Go to an XP station with IACC installed, create directory where the tarred
+SaveAll files will reside, run tar xvf a: from the shell environment to put the
+SaveAll files to the recently-created directory.  Then import them into IACC.
+Make sure that Nutcracker program is in the same drive as the SaveAll directory.

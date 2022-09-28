@@ -6,9 +6,15 @@ namespace IOCheckoutTool
 {
     internal class ErrorHandler : IDisposable
     {
-        public string LogPath { get; set; }
+        #region Fields
         private readonly StreamWriter ErrorLog;
         private readonly DirectoryInfo Project;
+        #endregion Fields
+        #region Properties
+        public string LogPath { get; set; }
+        #endregion Properties
+
+        #region Public Constructors
 
         public ErrorHandler(DirectoryInfo directory)
         {
@@ -31,16 +37,22 @@ namespace IOCheckoutTool
             LogPath = ((FileStream)ErrorLog.BaseStream).Name;
         }
 
-        public void LogError(string error)
-        {
-            string logmessage = string.Concat(DateTime.Now, ": ", error);
-            ErrorLog.WriteLine(logmessage);
-        }
+        #endregion Public Constructors
+
+        #region Public Methods
 
         public void Dispose()
         {
             ErrorLog.Close();
             ErrorLog.Dispose();
         }
+
+        public void LogError(string error)
+        {
+            string logmessage = string.Concat(DateTime.Now, ": ", error);
+            ErrorLog.WriteLine(logmessage);
+        }
+
+        #endregion Public Methods
     }
 }

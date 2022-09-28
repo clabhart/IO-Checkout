@@ -6,10 +6,14 @@ namespace IOCheckoutTool
 {
     public class CP : IDisposable
     {
-        public XmlDocument DAFile { get; set; }
+        #region Properties
         public XmlElement DA { get; set; }
+        public XmlDocument DAFile { get; set; }
         public DirectoryInfo Project { get; set; }
         private string CPName { get; set; }
+        #endregion Properties
+
+        #region Public Constructors
 
         public CP(string cp)
         {
@@ -22,11 +26,23 @@ namespace IOCheckoutTool
             DA = DAFile.CreateElement("DirectAccess");
         }
 
+        public CP()
+        {
+        }
+
+        #endregion Public Constructors
+
+        #region Public Methods
+
         public void Dispose()
         {
             Dispose(true);
             GC.SuppressFinalize(this);
         }
+
+        #endregion Public Methods
+
+        #region Protected Methods
 
         protected virtual void Dispose(bool disposing)
         {
@@ -36,5 +52,7 @@ namespace IOCheckoutTool
                 DAFile.Save(Path.Combine(Project.FullName, string.Concat("Direct Access ", CPName, ".xml")));
             }
         }
+
+        #endregion Protected Methods
     }
 }

@@ -1,12 +1,19 @@
-﻿using IOCheckoutTool.Properties;
-using System;
+﻿using System;
 using System.Globalization;
 using System.Windows.Forms;
+
+using IOCheckoutTool.Properties;
 
 namespace IOCheckoutTool
 {
     public partial class Email : Form
     {
+        #region Properties
+        public string EmailBody { get; set; }
+        #endregion Properties
+
+        #region Public Constructors
+
         public Email(string issue)
         {
             InitializeComponent();
@@ -17,7 +24,9 @@ namespace IOCheckoutTool
             }
         }
 
-        public string EmailBody { get; set; }
+        #endregion Public Constructors
+
+        #region Private Methods
 
         private void SendButton_Click(object sender, EventArgs e)
         {
@@ -29,5 +38,7 @@ namespace IOCheckoutTool
             EmailBody = Body.Text;
             Close();
         }
+
+        #endregion Private Methods
     }
 }

@@ -8,6 +8,26 @@ namespace IOCheckoutTool
 {
     public partial class BlockConfigurator : Form
     {
+        #region Fields
+        private string BIN;
+
+        private int BlockCount;
+
+        private string BOUT;
+
+        private string RIN;
+
+        private string ROUT;
+        #endregion Fields
+
+        #region Properties
+        public bool Analog { get; set; }
+
+        public List<string> Blocks { get; } = new List<string>();
+        #endregion Properties
+
+        #region Public Constructors
+
         public BlockConfigurator(string fbmname)
         {
             InitializeComponent();
@@ -16,62 +36,39 @@ namespace IOCheckoutTool
             Text += fbmname;
         }
 
-        public List<string> Blocks { get; } = new List<string>();
-        public bool Analog { get; set; }
-        private int BlockCount;
-        private string RIN;
-        private string ROUT;
-        private string BIN;
-        private string BOUT;
+        #endregion Public Constructors
 
-        private void BlockConfigurator_DragOver(object sender, DragEventArgs e)
-        {
-            e.Effect = DragDropEffects.Copy;
-        }
+        #region Private Methods
 
-        private void BlockOptions_MouseDown(object sender, MouseEventArgs e)
+        private static void RemoveNodes(TreeNode node)
         {
-            string block = BlockOptions.SelectedItem.ToString();
-            BlockOptions.DoDragDrop(block, DragDropEffects.Copy);
-        }
-
-        private void FBM_DragDrop(object sender, DragEventArgs e)
-        {
-            TreeNode dropnode = FBM.GetNodeAt(FBM.PointToClient(new Point(e.X, e.Y)));
-            string block = (string)e.Data.GetData(typeof(string));
-            dropnode.Nodes.Add(string.Concat("Block", BlockCount.ToString(CultureInfo.InvariantCulture)), block);
-            ++BlockCount;
-            dropnode.Expand();
-        }
-
-        private void FBM_DragEnter(object sender, DragEventArgs e)
-        {
-            e.Effect = DragDropEffects.Copy;
-        }
-
-        private void RemoveButton_Click(object sender, EventArgs e)
-        {
-            if (FBM.SelectedNode.Name != "FBM")
+            int count = node.Nodes.Count;
+            for (int i = 1; i <= count; ++i)
             {
-                FBM.SelectedNode.Remove();
+                node.Nodes[string.Concat("Block", i.ToString(CultureInfo.InvariantCulture))].Remove();
             }
         }
 
-        private void ConfigButton_Click(object sender, EventArgs e)
+        private void AllBINs_Click(object sender, EventArgs e)
         {
-            foreach (TreeNode node in FBM.Nodes["FBM"].Nodes)
+            RemoveNodes(FBM.Nodes["FBM"]);
+            BlockOptions.Enabled = false;
+            for (int i = 1; i <= 8; ++i)
             {
-                Blocks.Add(node.Text);
+                FBM.Nodes["FBM"].Nodes.Add(string.Concat("Block", i.ToString(CultureInfo.InvariantCulture)), BIN);
             }
-            if (Blocks.Contains("RIN") || Blocks.Contains("ROUT"))
+            FBM.Nodes["FBM"].Expand();
+        }
+
+        private void AllBOUTs_Click(object sender, EventArgs e)
+        {
+            RemoveNodes(FBM.Nodes["FBM"]);
+            BlockOptions.Enabled = false;
+            for (int i = 1; i <= 8; ++i)
             {
-                Analog = true;
+                FBM.Nodes["FBM"].Nodes.Add(string.Concat("Block", i.ToString(CultureInfo.InvariantCulture)), BOUT);
             }
-            else
-            {
-                Analog = false;
-            }
-            Close();
+            FBM.Nodes["FBM"].Expand();
         }
 
         private void AllRINs_Click(object sender, EventArgs e)
@@ -96,6 +93,56 @@ namespace IOCheckoutTool
             FBM.Nodes["FBM"].Expand();
         }
 
+        private void BlockConfigurator_DragOver(object sender, DragEventArgs e)
+        {
+            e.Effect = DragDropEffects.Copy;
+        }
+
+        private void BlockConfigurator_Load(object sender, EventArgs e)
+        {
+            RIN = "RIN";
+            ROUT = "ROUT";
+            BIN = "BIN";
+            BOUT = "BOUT";
+        }
+
+        private void BlockOptions_MouseDown(object sender, MouseEventArgs e)
+        {
+            string block = BlockOptions.SelectedItem.ToString();
+            BlockOptions.DoDragDrop(block, DragDropEffects.Copy);
+        }
+
+        private void ConfigButton_Click(object sender, EventArgs e)
+        {
+            foreach (TreeNode node in FBM.Nodes["FBM"].Nodes)
+            {
+                Blocks.Add(node.Text);
+            }
+            if (Blocks.Contains("RIN") || Blocks.Contains("ROUT"))
+            {
+                Analog = true;
+            }
+            else
+            {
+                Analog = false;
+            }
+            Close();
+        }
+
+        private void FBM_DragDrop(object sender, DragEventArgs e)
+        {
+            TreeNode dropnode = FBM.GetNodeAt(FBM.PointToClient(new Point(e.X, e.Y)));
+            string block = (string)e.Data.GetData(typeof(string));
+            dropnode.Nodes.Add(string.Concat("Block", BlockCount.ToString(CultureInfo.InvariantCulture)), block);
+            ++BlockCount;
+            dropnode.Expand();
+        }
+
+        private void FBM_DragEnter(object sender, DragEventArgs e)
+        {
+            e.Effect = DragDropEffects.Copy;
+        }
+
         private void HalfAnalog_Click(object sender, EventArgs e)
         {
             RemoveNodes(FBM.Nodes["FBM"]);
@@ -107,28 +154,6 @@ namespace IOCheckoutTool
             for (int i = 5; i <= 8; ++i)
             {
                 FBM.Nodes["FBM"].Nodes.Add(string.Concat("Block", i.ToString(CultureInfo.InvariantCulture)), ROUT);
-            }
-            FBM.Nodes["FBM"].Expand();
-        }
-
-        private void AllBINs_Click(object sender, EventArgs e)
-        {
-            RemoveNodes(FBM.Nodes["FBM"]);
-            BlockOptions.Enabled = false;
-            for (int i = 1; i <= 8; ++i)
-            {
-                FBM.Nodes["FBM"].Nodes.Add(string.Concat("Block", i.ToString(CultureInfo.InvariantCulture)), BIN);
-            }
-            FBM.Nodes["FBM"].Expand();
-        }
-
-        private void AllBOUTs_Click(object sender, EventArgs e)
-        {
-            RemoveNodes(FBM.Nodes["FBM"]);
-            BlockOptions.Enabled = false;
-            for (int i = 1; i <= 8; ++i)
-            {
-                FBM.Nodes["FBM"].Nodes.Add(string.Concat("Block", i.ToString(CultureInfo.InvariantCulture)), BOUT);
             }
             FBM.Nodes["FBM"].Expand();
         }
@@ -154,21 +179,14 @@ namespace IOCheckoutTool
             BlockOptions.Enabled = true;
         }
 
-        private static void RemoveNodes(TreeNode node)
+        private void RemoveButton_Click(object sender, EventArgs e)
         {
-            int count = node.Nodes.Count;
-            for (int i = 1; i <= count; ++i)
+            if (FBM.SelectedNode.Name != "FBM")
             {
-                node.Nodes[string.Concat("Block", i.ToString(CultureInfo.InvariantCulture))].Remove();
+                FBM.SelectedNode.Remove();
             }
         }
 
-        private void BlockConfigurator_Load(object sender, EventArgs e)
-        {
-            RIN = "RIN";
-            ROUT = "ROUT";
-            BIN = "BIN";
-            BOUT = "BOUT";
-        }
+        #endregion Private Methods
     }
 }
